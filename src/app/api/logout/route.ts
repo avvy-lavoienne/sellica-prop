@@ -5,7 +5,12 @@ export async function POST() {
   response.cookies.set("isLoggedIn", "", {
     httpOnly: true,
     path: "/",
-    maxAge: 0, // Hapus cookie
+    maxAge: 0,
+  });
+  response.cookies.set("userId", "", {
+    httpOnly: false, // Sesuaikan dengan pengaturan di login
+    path: "/",
+    maxAge: 0,
   });
 
   return response;

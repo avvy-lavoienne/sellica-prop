@@ -1,40 +1,14 @@
 import clientPromise from "@/lib/mongodb";
+import { User } from "@/types/user";
 import bcrypt from "bcryptjs";
 
-interface User {
-  nik: string;
-  password: string;
-}
-
-export async function registerUser(nik: string, password: string) {
-  const client = await clientPromise;
-  const db = client.db("sellica"); // Nama database
-
-  // Cek apakah NIK sudah terdaftar
-  const existingUser = await db.collection("users").findOne({ nik });
-  if (existingUser) {
-    throw new Error("NIK sudah terdaftar.");
-  }
-
-  // Hash password sebelum disimpan
-  const hashedPassword = await bcrypt.hash(password, 10);
-
-  // Simpan pengguna baru ke database
-  const result = await db.collection("users").insertOne({
-    nik,
-    password: hashedPassword,
-    createdAt: new Date(),
-  });
-
-  return result;
-}
-
-export async function loginUser(nik: string, password: string) {
+export async function loginUser(nik: string, password: string): Promise<User> {
   const client = await clientPromise;
   const db = client.db("sellica");
 
   // Cari pengguna berdasarkan NIK
-  const user = await db.collection("users").findOne({ nik });
+  const user = await db.collection<User>("users").findOne({ nik });
+
   if (!user) {
     throw new Error("NIK atau password salah.");
   }
@@ -45,5 +19,27 @@ export async function loginUser(nik: string, password: string) {
     throw new Error("NIK atau password salah.");
   }
 
-  return { nik: user.nik };
+  return user;
+}
+
+export async function registerUser(nik: string, name: string, password: string): Promise<User> {
+  const client = await clientPromise;
+  const db = client.db("sellica");
+
+  // Hash password sebelum menyimpan
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  // Simpan pengguna baru
+  const result = await db.collection<User>("users").insertOne({
+    nik,
+    name,
+    password: hashedPassword,
+  } as User);
+
+  return {
+    _id: result.insertedId,
+    nik,
+    name,
+    password: hashedPassword,
+  };
 }

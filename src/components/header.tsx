@@ -1,5 +1,6 @@
 import VyuLogo from "@/assets/images/vyu-logo.svg";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function Header() {
   const router = useRouter();
@@ -18,8 +19,15 @@ export default function Header() {
 
   return (
     <header className="bg-white shadow-md py-4 px-6 flex items-center justify-between">
-      {/* Spacer kosong di sebelah kiri untuk menyeimbangkan tata letak */}
-      <div className="w-1/3"></div>
+      {/* Navigasi di sebelah kiri */}
+      <div className="w-1/3 flex items-center space-x-4">
+        <Link href="/dashboard" className="text-gray-600 hover:text-gray-800">
+          Dashboard
+        </Link>
+        <Link href="/profile" className="text-gray-600 hover:text-gray-800">
+          Profile
+        </Link>
+      </div>
 
       {/* Logo di tengah */}
       <div className="w-1/3 flex justify-center">
