@@ -3,19 +3,24 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import VyuLogo from "@/assets/images/vyu-logo.svg";
+import { ArrowPathIcon } from "@heroicons/react/24/solid";
 
 export default function LoginForm() {
   const router = useRouter();
   const [nik, setNik] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true); // Mulai loading
+    setError(""); // Reset error sebelum request
 
     // Validasi NIK harus 16 angka
     if (!/^\d{16}$/.test(nik)) {
       setError("NIK harus terdiri dari 16 angka.");
+      setIsLoading(false);
       return;
     }
 
@@ -32,16 +37,26 @@ export default function LoginForm() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Terjadi kesalahan saat login.");
+        // Tangani error berdasarkan status code
+        if (response.status === 400) {
+          setError(data.error || "Data yang dimasukkan tidak valid (400).");
+        } else if (response.status === 401) {
+          setError(data.error || "NIK atau password salah (401).");
+        } else if (response.status === 500) {
+          setError(data.error || "Terjadi kesalahan server (500).");
+        } else {
+          setError(data.error || `Login gagal (${response.status}).`);
+        }
+        setIsLoading(false);
+        return;
       }
 
-      // Set cookie untuk status login (berlaku 1 jam)
-      document.cookie = "isLoggedIn=true; path=/; max-age=3600"
-
-      setError("");
+      // Login sukses, redirect ke dashboard
       router.push("/dashboard");
     } catch (err: any) {
-      setError(err.message);
+      // Tangani error jaringan atau lainnya
+      setError("Gagal terhubung ke server. Periksa koneksi Anda.");
+      setIsLoading(false);
     }
   };
 
@@ -51,6 +66,11 @@ export default function LoginForm() {
         <div className="flex justify-center mb-6">
           <img src={VyuLogo.src} alt="Vyu Logo" className="h-12 w-auto" />
         </div>
+        {error && (
+          <p className="text-red-500 text-sm text-center mb-4 p-2 bg-red-100 rounded-md">
+            {error}
+          </p>
+        )}
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label
@@ -68,6 +88,7 @@ export default function LoginForm() {
               placeholder="Masukkan NIK (16 angka)"
               maxLength={16}
               required
+              disabled={isLoading} // Nonaktifkan input saat loading
             />
           </div>
           <div>
@@ -85,16 +106,26 @@ export default function LoginForm() {
               className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
               placeholder="Masukkan password"
               required
+              disabled={isLoading} // Nonaktifkan input saat loading
             />
           </div>
-          {error && (
-            <p className="text-red-500 text-sm text-center">{error}</p>
-          )}
           <button
             type="submit"
-            className="w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+            className={`w-full py-2 px-4 rounded-md flex items-center justify-center ${
+              isLoading
+                ? "bg-indigo-400 cursor-not-allowed"
+                : "bg-indigo-600 hover:bg-indigo-700"
+            } text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2`}
+            disabled={isLoading}
           >
-            Login
+            {isLoading ? (
+              <>
+                <ArrowPathIcon className="w-5 h-5 mr-2 animate-spin text-white" />
+                Sedang login...
+              </>
+            ) : (
+              "Login"
+            )}
           </button>
         </form>
         <p className="mt-4 text-center text-sm text-gray-600">

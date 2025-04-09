@@ -55,7 +55,7 @@ export async function POST(request: Request) {
     console.error("Error saat login:", error.message);
     const status = error.message.includes("NIK atau password salah") ? 401 : 500;
     const errorMessage =
-      status === 401 ? "NIK atau password salah." : "Terjadi kesalahan server.";
+      status === 401 ? "NIK atau password salah." : "Terjadi kesalahan server saat login.";
 
     return NextResponse.json({ error: errorMessage }, { status });
   }
