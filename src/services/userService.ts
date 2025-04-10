@@ -19,7 +19,14 @@ export async function loginUser(nik: string, password: string): Promise<User> {
     throw new Error("NIK atau password salah.");
   }
 
-  return user;
+  // Kembalikan data pengguna dengan _id sebagai string
+  return {
+    _id: user._id.toString(),
+    nik: user.nik,
+    name: user.name,
+    password: user.password,
+    createdAt: user.createdAt,
+  };
 }
 
 export async function registerUser(nik: string, name: string, password: string): Promise<User> {
@@ -34,12 +41,15 @@ export async function registerUser(nik: string, name: string, password: string):
     nik,
     name,
     password: hashedPassword,
+    createdAt: new Date(),
   } as User);
 
+  // Kembalikan data pengguna dengan _id sebagai string
   return {
-    _id: result.insertedId,
+    _id: result.insertedId.toString(),
     nik,
     name,
     password: hashedPassword,
+    createdAt: new Date(),
   };
 }

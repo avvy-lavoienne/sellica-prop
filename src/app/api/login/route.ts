@@ -28,22 +28,23 @@ export async function POST(request: Request) {
     }
 
     const user: User = await loginUser(nik, password);
+    console.log("User ID yang diset ke cookie:", user._id);
 
     const response = NextResponse.json(
-      { message: "Login berhasil", user: { id: user._id.toString(), nik: user.nik } },
+      { message: "Login berhasil", user: { id: user._id, nik: user.nik } },
       { status: 200 }
     );
 
     response.cookies.set("isLoggedIn", "true", {
-      httpOnly: true,
+      httpOnly: false, // Bisa dibaca di client-side
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
       path: "/",
       maxAge: 86400,
     });
 
-    response.cookies.set("userId", user._id.toString(), {
-      httpOnly: false, // Hapus httpOnly agar bisa diakses di sisi klien
+    response.cookies.set("userId", user._id!, {
+      httpOnly: false,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
       path: "/",
