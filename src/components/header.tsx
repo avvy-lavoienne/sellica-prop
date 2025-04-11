@@ -1,6 +1,7 @@
 import VyuLogo from "@/assets/images/vyu-logo.svg";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 
 export default function Header() {
   const router = useRouter();
@@ -31,7 +32,7 @@ export default function Header() {
 
       {/* Logo di tengah */}
       <div className="w-1/3 flex justify-center">
-        <img src={VyuLogo.src} alt="Vyu Logo" className="h-10 w-auto" />
+        <Image src={VyuLogo.src} alt="Vyu Logo" className="h-10 w-auto" />
       </div>
 
       {/* Tombol Logout di sebelah kanan */}

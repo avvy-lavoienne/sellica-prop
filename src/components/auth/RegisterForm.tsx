@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import VyuLogo from "@/assets/images/vyu-logo.svg";
+import Image from "next/image";
 
 export default function RegisterForm() {
   const router = useRouter();
@@ -60,7 +61,7 @@ export default function RegisterForm() {
     <div className="flex items-center justify-center min-h-screen bg-gray-100">
       <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
         <div className="flex justify-center mb-6">
-          <img src={VyuLogo.src} alt="Vyu Logo" className="h-12 w-auto" />
+          <Image src={VyuLogo.src} alt="Vyu Logo" className="h-12 w-auto" />
         </div>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import VyuLogo from "@/assets/images/vyu-logo.svg";
 import { ArrowPathIcon, EyeIcon, EyeSlashIcon } from "@heroicons/react/24/solid";
 import { toast } from "react-toastify";
+import Image from "next/image";
 
 export default function LoginForm() {
   const router = useRouter();
@@ -64,7 +65,7 @@ export default function LoginForm() {
     <div className="flex items-center justify-center min-h-screen bg-gray-100">
       <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
         <div className="flex justify-center mb-6">
-          <img src={VyuLogo.src} alt="Vyu Logo" className="h-12 w-auto" />
+          <Image src={VyuLogo.src} alt="Vyu Logo" className="h-12 w-auto" />
         </div>
         {error && (
           <p className="text-red-500 text-sm text-center mb-4 p-2 bg-red-100 rounded-md">
