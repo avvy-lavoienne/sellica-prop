@@ -20,6 +20,8 @@ import {
   DocumentPlusIcon,
 } from "@heroicons/react/24/solid";
 import Image from "next/image";
+import { supabase } from "@/lib/supabaseClient";
+import { toast } from "react-toastify";
 
 interface SubCategory {
   name: string;
@@ -87,13 +89,17 @@ export default function Sidebar({ isSidebarCollapsed, setIsSidebarCollapsed }: S
 
   const handleLogout = async () => {
     try {
-      await fetch("/api/logout", {
-        method: "POST",
-      });
+      // Logout menggunakan Supabase
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      toast.success("Logout berhasil!");
       router.push("/");
     } catch (error) {
       console.error("Error saat logout:", error);
+      toast.error("Gagal logout. Silakan coba lagi.");
       router.push("/");
+    } finally {
+      setIsSidebarOpen(false);
     }
   };
 
@@ -103,6 +109,7 @@ export default function Sidebar({ isSidebarCollapsed, setIsSidebarCollapsed }: S
       <button
         className="md:hidden fixed top-4 left-4 z-50 p-2 bg-gray-800 text-white rounded"
         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+        aria-label={isSidebarOpen ? "Tutup sidebar" : "Buka sidebar"}
       >
         {isSidebarOpen ? (
           <XMarkIcon className="w-6 h-6" />
@@ -114,9 +121,10 @@ export default function Sidebar({ isSidebarCollapsed, setIsSidebarCollapsed }: S
       {/* Tombol Toggle Permanen untuk Collapse Sidebar */}
       <button
         className={`fixed top-4 z-50 p-2 bg-gray-800 text-white rounded transition-all duration-300 ${
-          isSidebarCollapsed ? "left-20" : "left-[calc(16rem+1rem)] md:left-[calc(16rem+1rem)]"
+          isSidebarCollapsed ? "left-16" : "left-64 md:left-64"
         }`}
         onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        aria-label={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
       >
         {isSidebarCollapsed ? (
           <ChevronRightIcon className="w-6 h-6" />
@@ -141,7 +149,7 @@ export default function Sidebar({ isSidebarCollapsed, setIsSidebarCollapsed }: S
               alt="Logo Pemda"
               width={40}
               height={40}
-              className="w-10 h-10 rounded-full object-cover" // Perbesar logo saat collapsed
+              className="w-10 h-10 rounded-full object-cover"
             />
           ) : (
             <div className="flex items-center">
@@ -168,9 +176,8 @@ export default function Sidebar({ isSidebarCollapsed, setIsSidebarCollapsed }: S
                   onClick={() => setIsSidebarOpen(false)}
                 >
                   <item.icon
-                    className={`${
-                      isSidebarCollapsed ? "w-8 h-8 mx-auto" : "w-5 h-5 mr-2"
-                    }`} // Perbesar ikon saat collapsed
+                    className={`${isSidebarCollapsed ? "w-8 h-8 mx-auto" : "w-5 h-5 mr-2"}`}
+                    aria-hidden="true"
                   />
                   <span className={isSidebarCollapsed ? "hidden" : "block"}>
                     {item.name}
@@ -185,20 +192,20 @@ export default function Sidebar({ isSidebarCollapsed, setIsSidebarCollapsed }: S
                 <button
                   onClick={() => toggleCategory(category.name)}
                   className="flex items-center w-full p-2 rounded hover:bg-gray-700 focus:outline-none"
+                  aria-label={`Toggle ${category.name}`}
                 >
                   <category.icon
-                    className={`${
-                      isSidebarCollapsed ? "w-8 h-8 mx-auto" : "w-5 h-5 mr-2"
-                    }`} // Perbesar ikon saat collapsed
+                    className={`${isSidebarCollapsed ? "w-8 h-8 mx-auto" : "w-5 h-5 mr-2"}`}
+                    aria-hidden="true"
                   />
                   <span className={isSidebarCollapsed ? "hidden" : "block"}>
                     {category.name}
                   </span>
                   {!isSidebarCollapsed &&
                     (openCategories.includes(category.name) ? (
-                      <ChevronDownIcon className="w-5 h-5 ml-auto" />
+                      <ChevronDownIcon className="w-5 h-5 ml-auto" aria-hidden="true" />
                     ) : (
-                      <ChevronRightIcon className="w-5 h-5 ml-auto" />
+                      <ChevronRightIcon className="w-5 h-5 ml-auto" aria-hidden="true" />
                     ))}
                 </button>
                 {!isSidebarCollapsed && openCategories.includes(category.name) && (
@@ -210,7 +217,7 @@ export default function Sidebar({ isSidebarCollapsed, setIsSidebarCollapsed }: S
                           className="flex items-center p-2 rounded hover:bg-gray-700"
                           onClick={() => setIsSidebarOpen(false)}
                         >
-                          <subCategory.icon className="w-5 h-5 mr-2" />
+                          <subCategory.icon className="w-5 h-5 mr-2" aria-hidden="true" />
                           <span>{subCategory.name}</span>
                         </Link>
                       </li>
@@ -228,11 +235,11 @@ export default function Sidebar({ isSidebarCollapsed, setIsSidebarCollapsed }: S
           className={`mt-auto p-2 rounded hover:bg-gray-700 flex items-center ${
             isSidebarCollapsed ? "justify-center" : "bg-red-600 text-white py-2 px-4 hover:bg-red-700"
           }`}
+          aria-label="Logout"
         >
           <XMarkIcon
-            className={`${
-              isSidebarCollapsed ? "w-8 h-8 mx-auto" : "w-5 h-5 mr-2"
-            }`} // Perbesar ikon saat collapsed
+            className={`${isSidebarCollapsed ? "w-8 h-8 mx-auto" : "w-5 h-5 mr-2"}`}
+            aria-hidden="true"
           />
           <span className={isSidebarCollapsed ? "hidden" : "block"}>Logout</span>
         </button>
@@ -243,6 +250,7 @@ export default function Sidebar({ isSidebarCollapsed, setIsSidebarCollapsed }: S
         <div
           className="fixed inset-0 bg-black opacity-50 md:hidden z-30"
           onClick={() => setIsSidebarOpen(false)}
+          aria-hidden="true"
         />
       )}
     </>

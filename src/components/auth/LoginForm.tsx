@@ -7,6 +7,7 @@ import { ArrowPathIcon, EyeIcon, EyeSlashIcon } from "@heroicons/react/24/solid"
 import { toast } from "react-toastify";
 import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
+import { login } from '@/app/login/action'
 
 export default function LoginForm() {
   const router = useRouter();
@@ -119,6 +120,7 @@ export default function LoginForm() {
                 : "bg-indigo-600 hover:bg-indigo-700"
             } text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2`}
             disabled={isLoading}
+            formAction={login}
           >
             {isLoading ? (
               <>
