@@ -77,7 +77,7 @@ export default function Sidebar({ isSidebarCollapsed, setIsSidebarCollapsed }: S
   const router = useRouter();
 
   const toggleCategory = (categoryName: string) => {
-    if (isSidebarCollapsed) return; // Jangan izinkan toggle kategori saat sidebar collapsed
+    if (isSidebarCollapsed) return;
     setOpenCategories((prev) =>
       prev.includes(categoryName)
         ? prev.filter((name) => name !== categoryName)
@@ -141,7 +141,7 @@ export default function Sidebar({ isSidebarCollapsed, setIsSidebarCollapsed }: S
               alt="Logo Pemda"
               width={40}
               height={40}
-              className="w-8 h-8 rounded-full object-cover"
+              className="w-10 h-10 rounded-full object-cover" // Perbesar logo saat collapsed
             />
           ) : (
             <div className="flex items-center">
@@ -167,7 +167,11 @@ export default function Sidebar({ isSidebarCollapsed, setIsSidebarCollapsed }: S
                   className="flex items-center p-2 rounded hover:bg-gray-700"
                   onClick={() => setIsSidebarOpen(false)}
                 >
-                  <item.icon className="w-5 h-5 mr-2" />
+                  <item.icon
+                    className={`${
+                      isSidebarCollapsed ? "w-8 h-8 mx-auto" : "w-5 h-5 mr-2"
+                    }`} // Perbesar ikon saat collapsed
+                  />
                   <span className={isSidebarCollapsed ? "hidden" : "block"}>
                     {item.name}
                   </span>
@@ -182,7 +186,11 @@ export default function Sidebar({ isSidebarCollapsed, setIsSidebarCollapsed }: S
                   onClick={() => toggleCategory(category.name)}
                   className="flex items-center w-full p-2 rounded hover:bg-gray-700 focus:outline-none"
                 >
-                  <category.icon className="w-5 h-5 mr-2" />
+                  <category.icon
+                    className={`${
+                      isSidebarCollapsed ? "w-8 h-8 mx-auto" : "w-5 h-5 mr-2"
+                    }`} // Perbesar ikon saat collapsed
+                  />
                   <span className={isSidebarCollapsed ? "hidden" : "block"}>
                     {category.name}
                   </span>
@@ -221,7 +229,11 @@ export default function Sidebar({ isSidebarCollapsed, setIsSidebarCollapsed }: S
             isSidebarCollapsed ? "justify-center" : "bg-red-600 text-white py-2 px-4 hover:bg-red-700"
           }`}
         >
-          <XMarkIcon className="w-5 h-5 mr-2" />
+          <XMarkIcon
+            className={`${
+              isSidebarCollapsed ? "w-8 h-8 mx-auto" : "w-5 h-5 mr-2"
+            }`} // Perbesar ikon saat collapsed
+          />
           <span className={isSidebarCollapsed ? "hidden" : "block"}>Logout</span>
         </button>
       </div>

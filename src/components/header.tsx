@@ -32,7 +32,7 @@ export default function Header() {
 
       {/* Logo di tengah */}
       <div className="w-1/3 flex justify-center">
-        <Image src={VyuLogo.src} alt="Vyu Logo" className="h-10 w-auto" />
+        <Image src={VyuLogo.src} width={32} height={32} alt="Vyu Logo" className="h-10 w-auto" />
       </div>
 
       {/* Tombol Logout di sebelah kanan */}

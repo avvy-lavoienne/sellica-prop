@@ -2,55 +2,36 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import ChartDashboard from "@/components/dashboard/ChartDashboard";
 
-export default function DashboardPage() {
+export default function DashboardPage({ isSidebarCollapsed }: { isSidebarCollapsed: boolean }) {
   const router = useRouter();
-  const [user, setUser] = useState<{ id: string; nik: string } | null>(null);
-  const [error, setError] = useState("");
-
-  const getUserIdFromCookie = () => {
-    const cookies = document.cookie.split("; ");
-    console.log("Cookies di dashboard:", document.cookie); // Logging cookies
-    const userIdCookie = cookies.find((cookie) => cookie.startsWith("userId="));
-    return userIdCookie ? userIdCookie.split("=")[1] : null;
-  };
+  const [isClient, setIsClient] = useState(false);
+  const [username, setUsername] = useState("User"); // Default username
 
   useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isClient) return;
+
+    // Cek apakah user sudah login
     const isLoggedIn = document.cookie.includes("isLoggedIn=true");
-    console.log("isLoggedIn:", isLoggedIn); // Logging status isLoggedIn
     if (!isLoggedIn) {
-      console.log("Redirect ke login: isLoggedIn tidak ditemukan");
       router.push("/");
       return;
     }
 
-    const userId = getUserIdFromCookie();
-    console.log("userId dari cookie:", userId); // Logging userId
-    if (!userId) {
-      console.log("Redirect ke login: userId tidak ditemukan");
-      router.push("/");
-      return;
+    // Ambil username dari cookie
+    const cookieUsername = document.cookie
+      .split("; ")
+      .find(row => row.startsWith("username="))
+      ?.split("=")[1];
+    if (cookieUsername) {
+      setUsername(cookieUsername);
     }
-
-    fetch(`/api/user/${userId}`)
-      .then((res) => res.json())
-      .then((data) => {
-        console.log("Respons dari /api/user/[id]:", data); // Logging respons API
-        if (data.error) {
-          setError(data.error);
-          console.log("Redirect ke login: Error dari API -", data.error);
-          router.push("/"); // Redirect ke login jika gagal mengambil data
-        } else {
-          setUser({ id: userId, nik: data.nik });
-        }
-      })
-      .catch((err) => {
-        console.error("Fetch error:", err); // Logging error fetch
-        setError("Gagal mengambil data pengguna.");
-        console.log("Redirect ke login: Fetch gagal");
-        router.push("/"); // Redirect ke login jika fetch gagal
-      });
-  }, [router]);
+  }, [router, isClient]);
 
   const handleLogout = () => {
     document.cookie = "isLoggedIn=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
@@ -58,7 +39,7 @@ export default function DashboardPage() {
     router.push("/");
   };
 
-  if (!user && !error) {
+  if (!isClient) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <p className="text-gray-600">Memuat...</p>
@@ -66,34 +47,16 @@ export default function DashboardPage() {
     );
   }
 
-  if (error || !user) {
-    return null; // Tidak menampilkan apa pun karena sudah redirect
-  }
-
   return (
-    <div className="min-h-screen bg-gray-100">
-      <header className="bg-indigo-600 text-white p-4">
-        <div className="container mx-auto flex justify-between items-center">
-          <h1 className="text-2xl font-bold">Dashboard Sellica</h1>
-          <button
-            onClick={handleLogout}
-            className="bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded-md"
-          >
-            Logout
-          </button>
-        </div>
-      </header>
-      <main className="container mx-auto p-6">
-        <div className="bg-white p-6 rounded-lg shadow-lg">
-          <h2 className="text-xl font-semibold mb-4">Selamat Datang!</h2>
-          <p className="text-gray-600 mb-2">
-            NIK Anda: <span className="font-medium">{user.nik}</span>
-          </p>
-          <p className="text-gray-600">
-            Ini adalah dashboard Sellica. Anda dapat melihat data atau mengelola akun Anda di sini.
-          </p>
-        </div>
-      </main>
-    </div>
+    <main>
+      <div className="mb-6">
+        <h2 className="text-3xl md:text-4xl font-bold text-gray-800 bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-teal-400">
+          Hello, {username}!
+        </h2>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+        <ChartDashboard />
+      </div>
+    </main>
   );
 }

@@ -6,10 +6,11 @@ import VyuLogo from "@/assets/images/vyu-logo.svg";
 import { ArrowPathIcon, EyeIcon, EyeSlashIcon } from "@heroicons/react/24/solid";
 import { toast } from "react-toastify";
 import Image from "next/image";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function LoginForm() {
   const router = useRouter();
-  const [nik, setNik] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -20,41 +21,29 @@ export default function LoginForm() {
     setIsLoading(true);
     setError("");
 
-    if (!/^\d{16}$/.test(nik)) {
-      setError("NIK harus terdiri dari 16 angka.");
-      setIsLoading(false);
-      return;
-    }
-
     try {
-      const response = await fetch("/api/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ nik, password }),
+      // Login menggunakan Supabase Auth dengan email langsung
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        if (response.status === 400) {
-          setError(data.error || "Data yang dimasukkan tidak valid (400).");
-        } else if (response.status === 401) {
-          setError(data.error || "NIK atau password salah (401).");
-        } else if (response.status === 500) {
-          setError(data.error || "Terjadi kesalahan server (500).");
+      if (error) {
+        if (error.message.includes("Invalid login credentials")) {
+          setError("Email atau password salah.");
         } else {
-          setError(data.error || `Login gagal (${response.status}).`);
+          setError(error.message);
         }
         setIsLoading(false);
         return;
       }
 
-      toast.success("Login berhasil! Mengarahkan ke dashboard...");
-      setTimeout(() => {
-        router.push("/dashboard");
-      }, 1500);
+      if (data.user) {
+        toast.success("Login berhasil! Mengarahkan ke dashboard...");
+        setTimeout(() => {
+          router.push("/dashboard");
+        }, 1500);
+      }
     } catch (err: any) {
       setError("Gagal terhubung ke server. Periksa koneksi Anda.");
       setIsLoading(false);
@@ -65,7 +54,7 @@ export default function LoginForm() {
     <div className="flex items-center justify-center min-h-screen bg-gray-100">
       <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
         <div className="flex justify-center mb-6">
-          <Image src={VyuLogo.src} alt="Vyu Logo" className="h-12 w-auto" />
+          <Image src={VyuLogo.src} width={32} height={32} alt="Vyu Logo" className="h-12 w-auto" />
         </div>
         {error && (
           <p className="text-red-500 text-sm text-center mb-4 p-2 bg-red-100 rounded-md">
@@ -75,19 +64,18 @@ export default function LoginForm() {
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label
-              htmlFor="nik"
+              htmlFor="email"
               className="block text-sm font-medium text-gray-700"
             >
-              Nomor Induk Kependudukan (NIK)
+              Email
             </label>
             <input
-              type="text"
-              id="nik"
-              value={nik}
-              onChange={(e) => setNik(e.target.value)}
+              type="email"
+              id="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              placeholder="Masukkan NIK (16 angka)"
-              maxLength={16}
+              placeholder="Masukkan email"
               required
               disabled={isLoading}
             />
