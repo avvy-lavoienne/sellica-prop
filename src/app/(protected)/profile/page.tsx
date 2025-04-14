@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "react-toastify";
-import VyuLogo from "@/assets/images/vyu-logo.svg";
+import ProfileHeader from "@/components/profile/ProfileHeader";
+import ProfileAvatar from "@/components/profile/ProfileAvatar";
+import ProfileForm from "@/components/profile/ProfileForm";
+import ProfileActions from "@/components/profile/ProfileActions";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -271,136 +273,26 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-gray-100 py-10">
       <div className="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-lg">
-        <div className="flex justify-center mb-6">
-          <Image
-            src={VyuLogo.src}
-            alt="VYU Logo"
-            width={150}
-            height={50}
-            priority
-            className="object-contain"
-          />
-        </div>
-
-        <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">
-          Profil Pengguna
-        </h1>
-
-        <div className="flex justify-center mb-6">
-          <div className="relative">
-            {avatarPreview || profile.avatar_url ? (
-              <Image
-                src={avatarPreview || (profile.avatar_url as string)}
-                alt="Foto Profil"
-                width={120}
-                height={120}
-                className="w-32 h-32 rounded-full object-cover border-4 border-gray-200"
-                unoptimized
-                priority
-                onError={(e) => {
-                  e.currentTarget.src = "/images/default-avatar.png";
-                }}
-              />
-            ) : (
-              <Image
-                src="/images/default-avatar.png"
-                alt="Foto Profil Default"
-                width={120}
-                height={120}
-                className="w-32 h-32 rounded-full object-cover border-4 border-gray-200"
-              />
-            )}
-            {isEditing && (
-              <label className="absolute bottom-0 right-0 bg-blue-500 text-white rounded-full p-2 cursor-pointer">
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png"
-                  className="hidden"
-                  onChange={handleAvatarChange}
-                />
-                <span>📷</span>
-              </label>
-            )}
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Nama</label>
-            {isEditing ? (
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                required
-              />
-            ) : (
-              <p className="mt-1 text-gray-900">{profile.name}</p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700">NIP</label>
-            {isEditing ? (
-              <input
-                type="text"
-                value={formData.nip}
-                onChange={(e) => setFormData({ ...formData, nip: e.target.value })}
-                className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              />
-            ) : (
-              <p className="mt-1 text-gray-900">{profile.nip || "-"}</p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Jabatan</label>
-            {isEditing ? (
-              <input
-                type="text"
-                value={formData.position}
-                onChange={(e) => setFormData({ ...formData, position: e.target.value })}
-                className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                required
-              />
-            ) : (
-              <p className="mt-1 text-gray-900">{profile.position || "-"}</p>
-            )}
-          </div>
-        </div>
-
-        <div className="mt-6 flex justify-center space-x-4">
-          {isEditing ? (
-            <>
-              <button
-                onClick={handleSave}
-                disabled={loading}
-                className={`px-6 py-2 rounded-md text-white ${
-                  loading
-                    ? "bg-indigo-400 cursor-not-allowed"
-                    : "bg-indigo-600 hover:bg-indigo-700"
-                } focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2`}
-              >
-                {loading ? "Menyimpan..." : "Simpan"}
-              </button>
-              <button
-                onClick={handleCancel}
-                disabled={loading}
-                className="px-6 py-2 rounded-md bg-gray-300 text-gray-700 hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
-              >
-                Batal
-              </button>
-            </>
-          ) : (
-            <button
-              onClick={() => setIsEditing(true)}
-              className="px-6 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-            >
-              Edit Profil
-            </button>
-          )}
-        </div>
+        <ProfileHeader />
+        <ProfileAvatar
+          avatarPreview={avatarPreview}
+          avatarUrl={profile.avatar_url}
+          isEditing={isEditing}
+          onAvatarChange={handleAvatarChange}
+        />
+        <ProfileForm
+          isEditing={isEditing}
+          formData={formData}
+          setFormData={setFormData}
+          profile={profile}
+        />
+        <ProfileActions
+          isEditing={isEditing}
+          loading={loading}
+          onEdit={() => setIsEditing(true)}
+          onSave={handleSave}
+          onCancel={handleCancel}
+        />
       </div>
     </div>
   );
