@@ -47,17 +47,6 @@ export default function DashboardPage({ isSidebarCollapsed }: { isSidebarCollaps
     checkSession();
   }, [router, isClient]);
 
-  const handleLogout = async () => {
-    try {
-      // Logout menggunakan Supabase
-      await supabase.auth.signOut();
-      router.push("/");
-    } catch (err) {
-      console.error("Error during logout:", err);
-      setError("Gagal logout. Silakan coba lagi.");
-    }
-  };
-
   if (!isClient) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
