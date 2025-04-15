@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "react-toastify";
 import ActionButtons from "@/components/ActionButton";
 import Switch from "@mui/material/Switch";
+import Pagination from "@mui/material/Pagination";
 
 interface SalahRekamData {
   id: string;
@@ -25,14 +26,41 @@ interface SalahRekamTableProps {
   rekapData: SalahRekamData[];
   onEdit: (data: SalahRekamData) => void;
   onDelete: (id: string) => void;
-  userRole: string; // Terima role pengguna
+  userRole: string;
 }
 
 export default function SalahRekamTable({ rekapData, onEdit, onDelete, userRole }: SalahRekamTableProps) {
   const [data, setData] = useState(rekapData); // State lokal untuk data tabel
+  const [filteredData, setFilteredData] = useState(rekapData); // Data setelah difilter
+  const [searchQuery, setSearchQuery] = useState(""); // State untuk search query
+  const [currentPage, setCurrentPage] = useState(1); // State untuk halaman saat ini
+  const rowsPerPage = 5; // Jumlah baris per halaman
+
+  // Update data lokal saat rekapData berubah
+  useEffect(() => {
+    setData(rekapData);
+    setFilteredData(rekapData);
+    setCurrentPage(1); // Reset ke halaman 1 saat data berubah
+  }, [rekapData]);
+
+  // Handle search filter
+  useEffect(() => {
+    const lowerCaseQuery = searchQuery.toLowerCase();
+    const filtered = data.filter((item) =>
+      Object.values(item).some((value) =>
+        typeof value === "string" && value.toLowerCase().includes(lowerCaseQuery)
+      )
+    );
+    setFilteredData(filtered);
+    setCurrentPage(1); // Reset ke halaman 1 saat filter berubah
+  }, [searchQuery, data]);
+
+  // Handle pagination
+  const totalPages = Math.ceil(filteredData.length / rowsPerPage);
+  const startIndex = (currentPage - 1) * rowsPerPage;
+  const paginatedData = filteredData.slice(startIndex, startIndex + rowsPerPage);
 
   const handleToggleChange = async (id: string, currentStatus: boolean) => {
-    // Hanya izinkan admin atau superuser mengubah toggle
     if (!["admin", "superuser"].includes(userRole)) {
       toast.error("Hanya admin atau superuser yang dapat mengubah status.");
       return;
@@ -50,7 +78,6 @@ export default function SalahRekamTable({ rekapData, onEdit, onDelete, userRole 
         throw new Error(`Gagal mengubah status: ${error.message}`);
       }
 
-      // Update state lokal agar UI langsung berubah
       setData(prevData =>
         prevData.map(item =>
           item.id === id ? { ...item, is_ready_to_record: newStatus } : item
@@ -70,13 +97,26 @@ export default function SalahRekamTable({ rekapData, onEdit, onDelete, userRole 
   const bodyRowClasses = "hover:bg-gray-50 h-14";
   const bodyCellClasses = "border border-gray-300 px-2 py-4 text-xs";
   const emptyCellClasses = "border border-gray-300 px-2 py-4 text-center text-xs";
+  const searchBoxClasses = "mb-4 w-full max-w-md mx-auto p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm placeholder-gray-400";
 
   return (
     <div className={wrapperDivClasses}>
+      {/* Searchbox */}
+      <div className="flex justify-center mb-6">
+        <input
+          type="text"
+          placeholder="Cari data (NIK, Nama, dll.)..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className={searchBoxClasses}
+        />
+      </div>
+
+      {/* Tabel */}
       <table className={tableClasses}>
         <thead>
           <tr className={headerRowClasses}>
-            <th className={headerCellClasses}>Status</th> {/* Kolom baru */}
+            <th className={headerCellClasses}>Status</th>
             <th className={headerCellClasses}>NIK Salah Rekam</th>
             <th className={headerCellClasses}>Nama Salah Rekam</th>
             <th className={headerCellClasses}>NIK Pemilik Biometric</th>
@@ -93,26 +133,26 @@ export default function SalahRekamTable({ rekapData, onEdit, onDelete, userRole 
           </tr>
         </thead>
         <tbody>
-          {data.length > 0 ? (
-            data.map((item) => (
+          {paginatedData.length > 0 ? (
+            paginatedData.map((item) => (
               <tr key={item.id} className={bodyRowClasses}>
                 <td className={bodyCellClasses}>
                   <Switch
                     checked={item.is_ready_to_record}
                     onChange={() => handleToggleChange(item.id, item.is_ready_to_record)}
-                    disabled={!["admin", "superuser"].includes(userRole)} // Nonaktifkan untuk non-admin
+                    disabled={!["admin", "superuser"].includes(userRole)}
                     sx={{
                       "& .MuiSwitch-switchBase.Mui-checked": {
-                        color: "#16a34a", // Hijau saat checked (siap rekam)
+                        color: "#16a34a",
                       },
                       "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": {
-                        backgroundColor: "#16a34a", // Track hijau saat checked
+                        backgroundColor: "#16a34a",
                       },
                       "& .MuiSwitch-switchBase": {
-                        color: "#dc2626", // Merah saat unchecked (belum siap)
+                        color: "#dc2626",
                       },
                       "& .MuiSwitch-switchBase + .MuiSwitch-track": {
-                        backgroundColor: "#dc2626", // Track merah saat unchecked
+                        backgroundColor: "#dc2626",
                       },
                     }}
                   />
@@ -150,12 +190,37 @@ export default function SalahRekamTable({ rekapData, onEdit, onDelete, userRole 
           ) : (
             <tr>
               <td colSpan={14} className={emptyCellClasses}>
-                Belum ada data yang diajukan.
+                Tidak ada data yang ditemukan.
               </td>
             </tr>
           )}
         </tbody>
       </table>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex justify-center mt-6">
+          <Pagination
+            count={totalPages}
+            page={currentPage}
+            onChange={(event, value) => setCurrentPage(value)}
+            color="primary"
+            sx={{
+              "& .MuiPaginationItem-root": {
+                color: "#4f46e5", // indigo-600
+                fontSize: "0.875rem",
+              },
+              "& .Mui-selected": {
+                backgroundColor: "#4f46e5 !important",
+                color: "white",
+              },
+              "& .MuiPaginationItem-root:hover": {
+                backgroundColor: "#e0e7ff", // indigo-100
+              },
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }
