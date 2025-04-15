@@ -1,10 +1,12 @@
 import Image from "next/image";
+import Compressor from "compressorjs";
+import { toast } from "react-toastify";
 
 interface ProfileAvatarProps {
   avatarPreview: string | null;
   avatarUrl: string | null;
   isEditing: boolean;
-  onAvatarChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onAvatarChange: (compressedFile: File, previewUrl: string) => void;
 }
 
 export default function ProfileAvatar({
@@ -13,6 +15,39 @@ export default function ProfileAvatar({
   isEditing,
   onAvatarChange,
 }: ProfileAvatarProps) {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validasi ukuran file sebelum kompresi
+      const maxSizeInMB = 2;
+      const maxSizeInBytes = maxSizeInMB * 1024 * 1024;
+      if (file.size > maxSizeInBytes) {
+        toast.error(`Ukuran file terlalu besar, maksimal ${maxSizeInMB} MB`);
+        return;
+      }
+
+      // Kompresi gambar
+      new Compressor(file, {
+        quality: 0.8, // Kualitas 80% untuk menjaga ketajaman
+        maxWidth: 300, // Resolusi maksimal untuk avatar
+        maxHeight: 300,
+        success(compressedResult) {
+          // Konversi Blob menjadi File
+          const compressedFile = new File([compressedResult], file.name, {
+            type: compressedResult.type,
+            lastModified: Date.now(),
+          });
+          const previewUrl = URL.createObjectURL(compressedFile);
+          onAvatarChange(compressedFile, previewUrl);
+        },
+        error(err) {
+          console.error("Compression error:", err);
+          toast.error("Gagal mengompresi gambar. Silakan coba lagi.");
+        },
+      });
+    }
+  };
+
   return (
     <div className="flex justify-center mb-6">
       <div className="relative">
@@ -44,7 +79,7 @@ export default function ProfileAvatar({
               type="file"
               accept="image/jpeg,image/png"
               className="hidden"
-              onChange={onAvatarChange}
+              onChange={handleChange}
             />
             <span>📷</span>
           </label>

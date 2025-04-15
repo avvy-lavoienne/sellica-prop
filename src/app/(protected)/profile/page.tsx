@@ -89,12 +89,9 @@ export default function ProfilePage() {
     fetchUserData();
   }, [router]);
 
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setAvatarFile(file);
-      setAvatarPreview(URL.createObjectURL(file));
-    }
+  const handleAvatarChange = (compressedFile: File, previewUrl: string) => {
+    setAvatarFile(compressedFile);
+    setAvatarPreview(previewUrl);
   };
 
   const handleCancel = () => {
