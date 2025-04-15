@@ -19,6 +19,7 @@ interface SalahRekamFormProps {
   setFormData: React.Dispatch<React.SetStateAction<FormData>>;
   onSubmit: (e: React.FormEvent) => void;
   loading: boolean;
+  isEditing: any;
 }
 
 export default function SalahRekamForm({

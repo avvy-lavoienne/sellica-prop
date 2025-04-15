@@ -23,12 +23,14 @@ interface SalahRekamData {
   nama_pengaju: string;
   tanggal_perekaman: string;
   created_at: string;
-  user_id: string; // Pastikan user_id ada di interface
+  user_id: string;
+  is_ready_to_record: boolean; // Tambah kolom baru
 }
 
 export default function SalahRekamPage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
+  const [userRole, setUserRole] = useState<string | null>(null); // Tambah state untuk role
   const [showForm, setShowForm] = useState(false);
   const [showRekap, setShowRekap] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -65,7 +67,7 @@ export default function SalahRekamPage() {
 
         const { data: profileData, error: profileError } = await supabase
           .from("profiles")
-          .select("name, nik")
+          .select("name, nik, role") // Ambil role
           .eq("id", session.user.id)
           .single();
 
@@ -80,6 +82,7 @@ export default function SalahRekamPage() {
           return;
         }
 
+        setUserRole(profileData.role || "user"); // Simpan role pengguna
         setFormData((prev) => ({
           ...prev,
           nik_pengaju: profileData.nik || "",
@@ -120,7 +123,11 @@ export default function SalahRekamPage() {
       }
 
       console.log("Fetched rekap data:", data);
-      setRekapData(data || []);
+      const updatedData = data.map(item => ({
+        ...item,
+        created_at: item.created_at || new Date().toISOString(),
+      }));
+      setRekapData(updatedData || []);
     } catch (error: any) {
       console.error("Error fetching rekap data:", error);
       toast.error(error.message || "Gagal mengambil data rekap. Silakan coba lagi.");
@@ -186,7 +193,6 @@ export default function SalahRekamPage() {
       if (isEditing && editData) {
         console.log("Updating data with ID:", editData.id, "for user_id:", user.id, "with data:", formData);
 
-        // Verifikasi data ada
         const { data: existingData, error: fetchError } = await supabase
           .from("salah_rekam")
           .select("id, user_id")
@@ -204,7 +210,6 @@ export default function SalahRekamPage() {
           throw new Error("Data tidak ditemukan atau Anda tidak memiliki akses.");
         }
 
-        // Lakukan update
         const { data, error } = await supabase
           .from("salah_rekam")
           .update({
@@ -251,6 +256,7 @@ export default function SalahRekamPage() {
           nik_pengaju: formData.nik_pengaju,
           nama_pengaju: formData.nama_pengaju.trim(),
           tanggal_perekaman: formData.tanggal_perekaman,
+          is_ready_to_record: false, // Set default saat insert
         }).select().single();
 
         if (error) {
@@ -327,7 +333,6 @@ export default function SalahRekamPage() {
     if (!confirm("Apakah Anda yakin ingin menghapus pengajuan ini?")) return;
 
     try {
-      // Verifikasi data ada
       const { data: existingData, error: fetchError } = await supabase
         .from("salah_rekam")
         .select("id, user_id")
@@ -345,7 +350,6 @@ export default function SalahRekamPage() {
         throw new Error("Data tidak ditemukan atau Anda tidak memiliki akses.");
       }
 
-      // Lakukan penghapusan
       const { data, error } = await supabase
         .from("salah_rekam")
         .delete()
@@ -378,7 +382,7 @@ export default function SalahRekamPage() {
     await fetchRekapData();
   };
 
-  if (!user) {
+  if (!user || userRole === null) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <p className="text-gray-600">Memuat...</p>
@@ -432,6 +436,7 @@ export default function SalahRekamPage() {
             rekapData={rekapData}
             onEdit={handleEdit}
             onDelete={handleDelete}
+            userRole={userRole} // Teruskan role ke SalahRekamTable
           />
         )}
       </div>
