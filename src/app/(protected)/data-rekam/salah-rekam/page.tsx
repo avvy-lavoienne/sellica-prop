@@ -23,6 +23,7 @@ interface SalahRekamData {
   nama_pengaju: string;
   tanggal_perekaman: string;
   created_at: string;
+  user_id: string; // Pastikan user_id ada di interface
 }
 
 export default function SalahRekamPage() {
@@ -53,11 +54,13 @@ export default function SalahRekamPage() {
       try {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         if (sessionError || !session) {
+          console.error("Session error:", sessionError);
           toast.error("Sesi tidak ditemukan. Silakan login kembali.");
           router.push("/");
           return;
         }
 
+        console.log("Authenticated user ID:", session.user.id);
         setUser(session.user);
 
         const { data: profileData, error: profileError } = await supabase
@@ -66,7 +69,10 @@ export default function SalahRekamPage() {
           .eq("id", session.user.id)
           .single();
 
-        if (profileError) throw new Error(`Gagal mengambil profil: ${profileError.message}`);
+        if (profileError) {
+          console.error("Profile error:", profileError);
+          throw new Error(`Gagal mengambil profil: ${profileError.message}`);
+        }
 
         if (!profileData.nik || !validateNIK(profileData.nik)) {
           toast.error("NIK Anda di profil tidak valid. Harap perbarui profil Anda terlebih dahulu.");
@@ -95,19 +101,25 @@ export default function SalahRekamPage() {
 
   const fetchRekapData = async () => {
     if (!user) {
+      console.error("No user found for fetching rekap data");
       toast.error("Pengguna tidak ditemukan. Silakan login kembali.");
       return;
     }
 
     try {
+      console.log("Fetching rekap data for user_id:", user.id);
       const { data, error } = await supabase
         .from("salah_rekam")
         .select("*")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
 
-      if (error) throw new Error(`Gagal mengambil data rekap: ${error.message}`);
+      if (error) {
+        console.error("Fetch rekap error:", error);
+        throw new Error(`Gagal mengambil data rekap: ${error.message}`);
+      }
 
+      console.log("Fetched rekap data:", data);
       setRekapData(data || []);
     } catch (error: any) {
       console.error("Error fetching rekap data:", error);
@@ -118,6 +130,7 @@ export default function SalahRekamPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) {
+      console.error("No user logged in");
       toast.error("Pengguna tidak ditemukan. Silakan login kembali.");
       return;
     }
@@ -171,7 +184,28 @@ export default function SalahRekamPage() {
 
     try {
       if (isEditing && editData) {
-        const { error } = await supabase
+        console.log("Updating data with ID:", editData.id, "for user_id:", user.id, "with data:", formData);
+
+        // Verifikasi data ada
+        const { data: existingData, error: fetchError } = await supabase
+          .from("salah_rekam")
+          .select("id, user_id")
+          .eq("id", editData.id)
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        if (fetchError) {
+          console.error("Error checking data existence:", fetchError);
+          throw new Error(`Gagal memeriksa data: ${fetchError.message}`);
+        }
+
+        if (!existingData) {
+          console.error("Data not found for ID:", editData.id, "and user_id:", user.id);
+          throw new Error("Data tidak ditemukan atau Anda tidak memiliki akses.");
+        }
+
+        // Lakukan update
+        const { data, error } = await supabase
           .from("salah_rekam")
           .update({
             nik_salah_rekam: formData.nik_salah_rekam,
@@ -186,13 +220,25 @@ export default function SalahRekamPage() {
             nama_pengaju: formData.nama_pengaju.trim(),
             tanggal_perekaman: formData.tanggal_perekaman,
           })
-          .eq("id", editData.id);
+          .eq("id", editData.id)
+          .eq("user_id", user.id)
+          .select()
+          .maybeSingle();
 
-        if (error) throw new Error(`Gagal mengedit data: ${error.message}`);
+        if (error) {
+          console.error("Update error:", error);
+          throw new Error(`Gagal mengedit data: ${error.message}`);
+        }
+
+        if (!data) {
+          console.error("No rows updated for ID:", editData.id);
+          throw new Error("Data tidak ditemukan atau tidak dapat diedit.");
+        }
 
         toast.success("Data berhasil diedit!");
       } else {
-        const { error } = await supabase.from("salah_rekam").insert({
+        console.log("Inserting new data:", formData);
+        const { data, error } = await supabase.from("salah_rekam").insert({
           user_id: user.id,
           nik_salah_rekam: formData.nik_salah_rekam,
           nama_salah_rekam: formData.nama_salah_rekam.trim(),
@@ -205,9 +251,12 @@ export default function SalahRekamPage() {
           nik_pengaju: formData.nik_pengaju,
           nama_pengaju: formData.nama_pengaju.trim(),
           tanggal_perekaman: formData.tanggal_perekaman,
-        });
+        }).select().single();
 
-        if (error) throw new Error(`Gagal mengajukan data: ${error.message}`);
+        if (error) {
+          console.error("Insert error:", error);
+          throw new Error(`Gagal mengajukan data: ${error.message}`);
+        }
 
         toast.success("Data berhasil diajukan!");
       }
@@ -262,16 +311,58 @@ export default function SalahRekamPage() {
   };
 
   const handleDelete = async (id: string) => {
-    console.log("handleDelete called with id:", id);
+    console.log("handleDelete called with id:", id, "and user_id:", user?.id);
+    if (!id) {
+      console.error("Invalid ID provided for deletion");
+      toast.error("ID tidak valid. Silakan coba lagi.");
+      return;
+    }
+
+    if (!user) {
+      console.error("No user logged in");
+      toast.error("Pengguna tidak ditemukan. Silakan login kembali.");
+      return;
+    }
+
     if (!confirm("Apakah Anda yakin ingin menghapus pengajuan ini?")) return;
 
     try {
-      const { error } = await supabase
+      // Verifikasi data ada
+      const { data: existingData, error: fetchError } = await supabase
+        .from("salah_rekam")
+        .select("id, user_id")
+        .eq("id", id)
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (fetchError) {
+        console.error("Error checking data existence:", fetchError);
+        throw new Error(`Gagal memeriksa data: ${fetchError.message}`);
+      }
+
+      if (!existingData) {
+        console.error("Data not found for ID:", id, "and user_id:", user.id);
+        throw new Error("Data tidak ditemukan atau Anda tidak memiliki akses.");
+      }
+
+      // Lakukan penghapusan
+      const { data, error } = await supabase
         .from("salah_rekam")
         .delete()
-        .eq("id", id);
+        .eq("id", id)
+        .eq("user_id", user.id)
+        .select()
+        .maybeSingle();
 
-      if (error) throw new Error(`Gagal menghapus data: ${error.message}`);
+      if (error) {
+        console.error("Delete error:", error);
+        throw new Error(`Gagal menghapus data: ${error.message}`);
+      }
+
+      if (!data) {
+        console.error("No rows deleted for ID:", id);
+        throw new Error("Data tidak ditemukan atau tidak dapat dihapus.");
+      }
 
       toast.success("Pengajuan berhasil dihapus!");
       await fetchRekapData();
@@ -296,7 +387,7 @@ export default function SalahRekamPage() {
   }
 
   const outerDivClasses = "min-h-screen bg-gray-100 py-10";
-  const innerDivClasses = "max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-lg";
+  const innerDivClasses = "max-w-7xl mx-auto bg-white p-8 rounded-lg shadow-lg";
 
   console.log("Passing handleEdit to SalahRekamTable:", handleEdit);
   console.log("Passing handleDelete to SalahRekamTable:", handleDelete);
