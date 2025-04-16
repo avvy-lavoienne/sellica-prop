@@ -5,11 +5,13 @@ import SummarizeIcon from "@mui/icons-material/Summarize";
 interface SalahRekamActionsProps {
   onAjukan: () => void;
   onRekapitulasi: () => void;
+  activeMode: "form" | "table" | "none"; // Tambah prop untuk mode aktif
 }
 
 export default function SalahRekamActions({
   onAjukan,
   onRekapitulasi,
+  activeMode,
 }: SalahRekamActionsProps) {
   return (
     <div className="flex justify-center space-x-4 mb-6">
@@ -21,9 +23,9 @@ export default function SalahRekamActions({
           px: 3,
           py: 1,
           borderRadius: "0.375rem",
-          backgroundColor: "#4f46e5", // indigo-600
+          backgroundColor: activeMode === "form" ? "#3b82f6" : "#4f46e5", // Biru lebih terang saat aktif
           "&:hover": {
-            backgroundColor: "#4338ca", // indigo-700
+            backgroundColor: activeMode === "form" ? "#2563eb" : "#4338ca",
           },
           textTransform: "none",
           fontSize: "1rem",
@@ -39,9 +41,9 @@ export default function SalahRekamActions({
           px: 3,
           py: 1,
           borderRadius: "0.375rem",
-          backgroundColor: "#16a34a", // green-600
+          backgroundColor: activeMode === "table" ? "#22c55e" : "#16a34a", // Hijau lebih terang saat aktif
           "&:hover": {
-            backgroundColor: "#15803d", // green-700
+            backgroundColor: activeMode === "table" ? "#16a34a" : "#15803d",
           },
           textTransform: "none",
           fontSize: "1rem",

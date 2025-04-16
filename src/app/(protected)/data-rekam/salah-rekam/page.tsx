@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "react-toastify";
@@ -8,6 +8,7 @@ import SalahRekamHeader from "@/components/salah-rekam/SalahRekamHeader";
 import SalahRekamActions from "@/components/salah-rekam/SalahRekamActions";
 import SalahRekamForm from "@/components/salah-rekam/SalahRekamForm";
 import SalahRekamTable from "@/components/salah-rekam/SalahRekamTable";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface SalahRekamData {
   id: string;
@@ -29,7 +30,7 @@ interface SalahRekamData {
 export default function SalahRekamPage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
-  const [userRole, setUserRole] = useState<string | null>(null); // Tambah state untuk role
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [showRekap, setShowRekap] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -49,10 +50,15 @@ export default function SalahRekamPage() {
   });
   const [rekapData, setRekapData] = useState<SalahRekamData[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isFetchingUser, setIsFetchingUser] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [totalCount, setTotalCount] = useState(0);
 
   useEffect(() => {
     const fetchUserData = async () => {
       try {
+        setIsFetchingUser(true);
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         if (sessionError || !session) {
           console.error("Session error:", sessionError);
@@ -66,7 +72,7 @@ export default function SalahRekamPage() {
 
         const { data: profileData, error: profileError } = await supabase
           .from("profiles")
-          .select("name, nik, role") // Ambil role
+          .select("name, nik, role")
           .eq("id", session.user.id)
           .single();
 
@@ -81,7 +87,7 @@ export default function SalahRekamPage() {
           return;
         }
 
-        setUserRole(profileData.role || "user"); // Simpan role pengguna
+        setUserRole(profileData.role || "user");
         setFormData((prev) => ({
           ...prev,
           nik_pengaju: profileData.nik || "",
@@ -91,6 +97,8 @@ export default function SalahRekamPage() {
         console.error("Error fetching user:", error);
         toast.error(error.message || "Gagal memuat data pengguna. Silakan coba lagi.");
         router.push("/");
+      } finally {
+        setIsFetchingUser(false);
       }
     };
 
@@ -101,37 +109,47 @@ export default function SalahRekamPage() {
     return nik.length === 16 && /^\d{16}$/.test(nik);
   };
 
-  const fetchRekapData = async () => {
+  const fetchRekapData = useCallback(async (page: number = 1, searchQuery: string = "") => {
     if (!user) {
-      console.error("No user found for fetching rekap data");
       toast.error("Pengguna tidak ditemukan. Silakan login kembali.");
-      return;
+      return { totalCount: 0 };
     }
 
     try {
-      console.log("Fetching rekap data for user_id:", user.id);
-      const { data, error } = await supabase
+      const rowsPerPage = 5;
+      const start = (page - 1) * rowsPerPage;
+      const end = start + rowsPerPage - 1;
+
+      let query = supabase
         .from("salah_rekam")
-        .select("*")
+        .select("*", { count: "exact" })
         .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .range(start, end);
+
+      if (searchQuery) {
+        query = query.or(
+          `nik_salah_rekam.ilike.%${searchQuery}%,nama_salah_rekam.ilike.%${searchQuery}%,nik_pemilik_biometric.ilike.%${searchQuery}%,nama_pemilik_biometric.ilike.%${searchQuery}%`
+        );
+      }
+
+      const { data, error, count } = await query;
 
       if (error) {
-        console.error("Fetch rekap error:", error);
         throw new Error(`Gagal mengambil data rekap: ${error.message}`);
       }
 
-      console.log("Fetched rekap data:", data);
       const updatedData = data.map(item => ({
         ...item,
         created_at: item.created_at || new Date().toISOString(),
       }));
       setRekapData(updatedData || []);
+      return { totalCount: count || 0 };
     } catch (error: any) {
-      console.error("Error fetching rekap data:", error);
       toast.error(error.message || "Gagal mengambil data rekap. Silakan coba lagi.");
+      return { totalCount: 0 };
     }
-  };
+  }, [user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -255,7 +273,7 @@ export default function SalahRekamPage() {
           nik_pengaju: formData.nik_pengaju,
           nama_pengaju: formData.nama_pengaju.trim(),
           tanggal_perekaman: formData.tanggal_perekaman,
-          is_ready_to_record: false, // Set default saat insert
+          is_ready_to_record: false,
         }).select().single();
 
         if (error) {
@@ -284,7 +302,8 @@ export default function SalahRekamPage() {
       });
 
       if (showRekap) {
-        await fetchRekapData();
+        const { totalCount } = await fetchRekapData(currentPage, searchQuery);
+        setTotalCount(totalCount);
       }
     } catch (error: any) {
       console.error("Error submitting data:", error);
@@ -299,17 +318,17 @@ export default function SalahRekamPage() {
     setIsEditing(true);
     setEditData(data);
     setFormData({
-      nik_salah_rekam: data.nik_salah_rekam,
-      nama_salah_rekam: data.nama_salah_rekam,
-      nik_pemilik_biometric: data.nik_pemilik_biometric,
-      nama_pemilik_biometric: data.nama_pemilik_biometric,
-      nik_pemilik_foto: data.nik_pemilik_foto,
-      nama_pemilik_foto: data.nama_pemilik_foto,
-      nik_petugas_rekam: data.nik_petugas_rekam,
-      nama_petugas_rekam: data.nama_petugas_rekam,
-      nik_pengaju: data.nik_pengaju,
-      nama_pengaju: data.nama_pengaju,
-      tanggal_perekaman: data.tanggal_perekaman,
+      nik_salah_rekam: data.nik_salah_rekam || "",
+      nama_salah_rekam: data.nama_salah_rekam || "",
+      nik_pemilik_biometric: data.nik_pemilik_biometric || "",
+      nama_pemilik_biometric: data.nama_pemilik_biometric || "",
+      nik_pemilik_foto: data.nik_pemilik_foto || "",
+      nama_pemilik_foto: data.nama_pemilik_foto || "",
+      nik_petugas_rekam: data.nik_petugas_rekam || "",
+      nama_petugas_rekam: data.nama_petugas_rekam || "",
+      nik_pengaju: data.nik_pengaju || "",
+      nama_pengaju: data.nama_pengaju || "",
+      tanggal_perekaman: data.tanggal_perekaman || "",
     });
     setShowForm(true);
     setShowRekap(false);
@@ -368,23 +387,67 @@ export default function SalahRekamPage() {
       }
 
       toast.success("Pengajuan berhasil dihapus!");
-      await fetchRekapData();
+      const { totalCount } = await fetchRekapData(currentPage, searchQuery);
+      setTotalCount(totalCount);
     } catch (error: any) {
       console.error("Error deleting data:", error);
       toast.error(error.message || "Gagal menghapus data. Silakan coba lagi.");
     }
   };
 
-  const handleRekapitulasi = async () => {
+  const handleRekapitulasi = useCallback(async () => {
     setShowRekap(true);
     setShowForm(false);
-    await fetchRekapData();
-  };
+    const { totalCount } = await fetchRekapData(currentPage, searchQuery);
+    setTotalCount(totalCount);
+  }, [currentPage, searchQuery, fetchRekapData]);
 
-  if (!user || userRole === null) {
+  const handlePageChange = useCallback(async (page: number) => {
+    setCurrentPage(page);
+    const { totalCount } = await fetchRekapData(page, searchQuery);
+    setTotalCount(totalCount);
+  }, [searchQuery, fetchRekapData]);
+
+  const handleSearch = useCallback(async (query: string) => {
+    setSearchQuery(query);
+    setCurrentPage(1);
+    const { totalCount } = await fetchRekapData(1, query);
+    setTotalCount(totalCount);
+  }, [fetchRekapData]);
+
+  const handleRefresh = useCallback(async () => {
+    setCurrentPage(1);
+    setSearchQuery("");
+    const { totalCount } = await fetchRekapData(1, "");
+    setTotalCount(totalCount);
+  }, [fetchRekapData]);
+
+  if (isFetchingUser || !user || userRole === null) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <p className="text-gray-600">Memuat...</p>
+        <div className="flex items-center space-x-2">
+          <svg
+            className="animate-spin h-5 w-5 text-indigo-600"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            />
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8v8H4z"
+            />
+          </svg>
+          <p className="text-gray-600">Memuat...</p>
+        </div>
       </div>
     );
   }
@@ -420,24 +483,66 @@ export default function SalahRekamPage() {
             });
           }}
           onRekapitulasi={handleRekapitulasi}
+          activeMode={showForm ? "form" : showRekap ? "table" : "none"}
         />
-        {showForm && (
-          <SalahRekamForm
-            formData={formData}
-            setFormData={setFormData}
-            onSubmit={handleSubmit}
-            loading={loading}
-            isEditing={isEditing}
-          />
-        )}
-        {showRekap && (
-          <SalahRekamTable
-            rekapData={rekapData}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-            userRole={userRole} // Teruskan role ke SalahRekamTable
-          />
-        )}
+        <AnimatePresence mode="wait">
+          {showForm && (
+            <motion.div
+              key="form"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+            >
+              <SalahRekamForm
+                formData={formData}
+                setFormData={setFormData}
+                onSubmit={handleSubmit}
+                onCancel={() => {
+                  setShowForm(false);
+                  setIsEditing(false);
+                  setEditData(null);
+                  setFormData({
+                    nik_salah_rekam: "",
+                    nama_salah_rekam: "",
+                    nik_pemilik_biometric: "",
+                    nama_pemilik_biometric: "",
+                    nik_pemilik_foto: "",
+                    nama_pemilik_foto: "",
+                    nik_petugas_rekam: "",
+                    nama_petugas_rekam: "",
+                    nik_pengaju: formData.nik_pengaju,
+                    nama_pengaju: formData.nama_pengaju,
+                    tanggal_perekaman: "",
+                  });
+                }}
+                loading={loading}
+                isEditing={isEditing}
+              />
+            </motion.div>
+          )}
+          {showRekap && (
+            <motion.div
+              key="table"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+            >
+              <SalahRekamTable
+                rekapData={rekapData}
+                totalCount={totalCount}
+                currentPage={currentPage}
+                onPageChange={handlePageChange}
+                onSearch={handleSearch}
+                onRefresh={handleRefresh}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+                userRole={userRole}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

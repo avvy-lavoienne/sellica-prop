@@ -3,6 +3,9 @@ import { PencilIcon, TrashIcon } from "@heroicons/react/24/outline";
 interface ActionButtonsProps {
   onEdit: () => void;
   onDelete: () => void;
+  onDetail?: () => void;
+  showDetailButton?: boolean;
+  isDetailOpen?: boolean;
 }
 
 export default function ActionButtons({ onEdit, onDelete }: ActionButtonsProps) {
