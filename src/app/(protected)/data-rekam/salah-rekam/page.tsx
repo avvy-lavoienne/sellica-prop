@@ -23,8 +23,7 @@ interface SalahRekamData {
   nama_pengaju: string;
   tanggal_perekaman: string;
   created_at: string;
-  user_id: string;
-  is_ready_to_record: boolean; // Tambah kolom baru
+  is_ready_to_record: boolean;
 }
 
 export default function SalahRekamPage() {
