@@ -1,41 +1,39 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "react-toastify";
 import ActionButtons from "@/components/ActionButton";
 import Switch from "@mui/material/Switch";
 import Pagination from "@mui/material/Pagination";
 import Tooltip from "@mui/material/Tooltip";
+import { motion } from "framer-motion";
 
-interface SalahRekamData {
+interface AdjudicateRecordData {
   id: string;
-  nik_salah_rekam: string;
-  nama_salah_rekam: string;
-  nik_pemilik_biometric: string;
-  nama_pemilik_biometric: string;
-  nik_pemilik_foto: string;
-  nama_pemilik_foto: string;
-  nik_petugas_rekam: string;
-  nama_petugas_rekam: string;
+  user_id: string;
+  nik_adjudicate: string;
+  nama_adjudicate: string;
   nik_pengaju: string;
   nama_pengaju: string;
-  tanggal_perekaman: string;
+  jenis_eksepsi: string;
+  tanggal_pengajuan: string;
   created_at: string;
   is_ready_to_record: boolean;
 }
 
-interface SalahRekamTableProps {
-  rekapData: SalahRekamData[];
+interface AdjudicateRecordTableProps {
+  rekapData: AdjudicateRecordData[];
   totalCount: number;
   currentPage: number;
   onPageChange: (page: number) => void;
   onSearch: (query: string) => void;
   onRefresh: () => void;
-  onEdit: (data: SalahRekamData) => void;
+  onEdit: (data: AdjudicateRecordData) => void;
   onDelete: (id: string) => void;
   userRole: string;
+  isTableLoading: boolean;
 }
 
-export default function SalahRekamTable({
+export default function AdjudicateRecordTable({
   rekapData,
   totalCount,
   currentPage,
@@ -45,12 +43,13 @@ export default function SalahRekamTable({
   onEdit,
   onDelete,
   userRole,
-}: SalahRekamTableProps) {
+  isTableLoading,
+}: AdjudicateRecordTableProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
   useEffect(() => {
-    if (searchQuery === "") return; // Jangan panggil onSearch jika searchQuery kosong
+    if (searchQuery === "") return;
 
     const timeout = setTimeout(() => {
       onSearch(searchQuery);
@@ -70,14 +69,11 @@ export default function SalahRekamTable({
     try {
       const newStatus = !currentStatus;
       const { error } = await supabase
-        .from("salah_rekam")
+        .from("adjudicate_record")
         .update({ is_ready_to_record: newStatus })
         .eq("id", id);
 
-      if (error) {
-        console.error("Error updating status:", error);
-        throw new Error(`Gagal mengubah status: ${error.message}`);
-      }
+      if (error) throw new Error(`Gagal mengubah status: ${error.message}`);
 
       toast.success("Status berhasil diubah!");
       onRefresh();
@@ -85,6 +81,17 @@ export default function SalahRekamTable({
       console.error("Error updating status:", error);
       toast.error(error.message || "Gagal mengubah status. Silakan coba lagi.");
     }
+  };
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toString() !== "Invalid Date"
+      ? date.toLocaleDateString("id-ID", {
+          day: "2-digit",
+          month: "long",
+          year: "numeric",
+        })
+      : "Tanggal tidak valid";
   };
 
   const wrapperDivClasses = "overflow-x-auto px-4 py-6";
@@ -95,25 +102,71 @@ export default function SalahRekamTable({
   const bodyCellClasses = "border border-gray-300 px-2 py-4 text-xs";
   const emptyCellClasses = "border border-gray-300 px-2 py-4 text-center text-xs";
   const searchBoxClasses = "w-full max-w-md p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm placeholder-gray-400";
+  const skeletonRowClasses = "h-14 bg-gray-200 animate-pulse rounded-md";
+  const skeletonCellClasses = "border border-gray-300 px-2 py-4";
+
+  const SkeletonTable = () => (
+    <table className={tableClasses}>
+      <thead>
+        <tr className={headerRowClasses}>
+          <th className={headerCellClasses}>No</th>
+          <th className={headerCellClasses}>Tanggal Pengajuan</th>
+          <th className={headerCellClasses}>NIK Adjudicate</th>
+          <th className={headerCellClasses}>Nama Adjudicate</th>
+          <th className="hidden md:table-cell border border-gray-300 px-2 py-4 text-left text-xs font-medium text-gray-700">Jenis Eksepsi</th>
+          <th className={headerCellClasses}>Status</th>
+          <th className={headerCellClasses}>Aksi</th>
+        </tr>
+      </thead>
+      <tbody>
+        {[...Array(5)].map((_, index) => (
+          <tr key={`skeleton-${index}`} className={bodyRowClasses}>
+            <td className={skeletonCellClasses}>
+              <div className={`${skeletonRowClasses} h-4 w-8 mx-auto`}></div>
+            </td>
+            <td className={skeletonCellClasses}>
+              <div className={`${skeletonRowClasses} h-4 w-24`}></div>
+            </td>
+            <td className={skeletonCellClasses}>
+              <div className={`${skeletonRowClasses} h-4 w-32`}></div>
+            </td>
+            <td className={skeletonCellClasses}>
+              <div className={`${skeletonRowClasses} h-4 w-40`}></div>
+            </td>
+            <td className="hidden md:table-cell border border-gray-300 px-2 py-4">
+              <div className={`${skeletonRowClasses} h-4 w-32`}></div>
+            </td>
+            <td className={skeletonCellClasses}>
+              <div className={`${skeletonRowClasses} h-6 w-12 mx-auto`}></div>
+            </td>
+            <td className={skeletonCellClasses}>
+              <div className={`${skeletonRowClasses} h-6 w-20 mx-auto`}></div>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
 
   return (
     <div className={wrapperDivClasses}>
-      {/* Searchbox dan Tombol Refresh */}
       <div className="flex justify-center mb-6 space-x-4">
         <div className="relative flex-1 max-w-md">
           <input
             type="text"
-            placeholder="Cari data (NIK, Nama, dll.)..."
+            placeholder="Cari data (NIK, Nama)..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className={searchBoxClasses}
             aria-label="Cari data di tabel"
+            disabled={isTableLoading}
           />
           {searchQuery && (
             <button
               onClick={() => setSearchQuery("")}
               className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
               aria-label="Hapus pencarian"
+              disabled={isTableLoading}
             >
               <svg
                 className="h-5 w-5"
@@ -134,70 +187,69 @@ export default function SalahRekamTable({
         </div>
         <button
           onClick={onRefresh}
-          className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className={`px-4 py-2 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+            isTableLoading
+              ? "bg-indigo-400 cursor-not-allowed"
+              : "bg-indigo-600 hover:bg-indigo-700"
+          }`}
           aria-label="Refresh data"
           tabIndex={0}
+          disabled={isTableLoading}
         >
-          Refresh
+          {isTableLoading ? "Memuat..." : "Refresh"}
         </button>
       </div>
 
-      {/* Tabel */}
       <div className="overflow-x-auto">
-        <table className={tableClasses}>
-          <thead>
-            <tr className={headerRowClasses}>
-              <th className={headerCellClasses}>No</th>
-              <th className={headerCellClasses}>Tanggal Pengajuan</th>
-              <th className={headerCellClasses}>NIK Salah Rekam</th>
-              <th className={headerCellClasses}>Nama Salah Rekam</th>
-              <th className="hidden md:table-cell border border-gray-300 px-2 py-4 text-left text-xs font-medium text-gray-700">NIK Pemilik Biometric</th>
-              <th className="hidden md:table-cell border border-gray-300 px-2 py-4 text-left text-xs font-medium text-gray-700">Nama Pemilik Biometric</th>
-              <th className="hidden md:table-cell border border-gray-300 px-2 py-4 text-left text-xs font-medium text-gray-700">NIK Pemilik Foto</th>
-              <th className="hidden md:table-cell border border-gray-300 px-2 py-4 text-left text-xs font-medium text-gray-700">Nama Pemilik Foto</th>
-              <th className="hidden md:table-cell border border-gray-300 px-2 py-4 text-left text-xs font-medium text-gray-700">NIK Petugas Rekam</th>
-              <th className="hidden md:table-cell border border-gray-300 px-2 py-4 text-left text-xs font-medium text-gray-700">Nama Petugas Rekam</th>
-              <th className="hidden md:table-cell border border-gray-300 px-2 py-4 text-left text-xs font-medium text-gray-700">Tanggal Perekaman</th>
-              <th className={headerCellClasses}>Status</th>
-              <th className={headerCellClasses}>Aksi</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rekapData.length === 0 ? (
-              <tr>
-                <td colSpan={13} className={emptyCellClasses}>
+        {isTableLoading ? (
+          <SkeletonTable />
+        ) : rekapData.length === 0 ? (
+          <table className={tableClasses}>
+            <thead>
+              <tr className={headerRowClasses}>
+                <th className={headerCellClasses}>No</th>
+                <th className={headerCellClasses}>Tanggal Pengajuan</th>
+                <th className={headerCellClasses}>NIK Adjudicate</th>
+                <th className={headerCellClasses}>Nama Adjudicate</th>
+                <th className="hidden md:table-cell border border-gray-300 px-2 py-4 text-left text-xs font-medium text-gray-700">Jenis Eksepsi</th>
+                <th className={headerCellClasses}>Status</th>
+                <th className={headerCellClasses}>Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr key="empty-row">
+                <td colSpan={7} className={emptyCellClasses}>
                   Tidak ada data yang ditemukan.
                 </td>
               </tr>
-            ) : (
-              rekapData.map((item, index) => {
+            </tbody>
+          </table>
+        ) : (
+          <table className={tableClasses}>
+            <thead>
+              <tr className={headerRowClasses}>
+                <th className={headerCellClasses}>No</th>
+                <th className={headerCellClasses}>Tanggal Pengajuan</th>
+                <th className={headerCellClasses}>NIK Adjudicate</th>
+                <th className={headerCellClasses}>Nama Adjudicate</th>
+                <th className="hidden md:table-cell border border-gray-300 px-2 py-4 text-left text-xs font-medium text-gray-700">Jenis Eksepsi</th>
+                <th className={headerCellClasses}>Status</th>
+                <th className={headerCellClasses}>Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rekapData.map((item, index) => {
                 const rowNumber = (currentPage - 1) * rowsPerPage + index + 1;
                 const isExpanded = expandedRow === item.id;
                 return (
-                  <>
-                    <tr key={item.id} className={bodyRowClasses}>
+                  <React.Fragment key={item.id}>
+                    <tr className={bodyRowClasses}>
                       <td className={bodyCellClasses}>{rowNumber}</td>
-                      <td className={bodyCellClasses}>
-                        {new Date(item.created_at).toLocaleDateString("id-ID", {
-                          day: "2-digit",
-                          month: "long",
-                          year: "numeric",
-                        })}
-                      </td>
-                      <td className={bodyCellClasses}>{item.nik_salah_rekam}</td>
-                      <td className={bodyCellClasses}>{item.nama_salah_rekam}</td>
-                      <td className="hidden md:table-cell border border-gray-300 px-2 py-4 text-xs">{item.nik_pemilik_biometric}</td>
-                      <td className="hidden md:table-cell border border-gray-300 px-2 py-4 text-xs">{item.nama_pemilik_biometric}</td>
-                      <td className="hidden md:table-cell border border-gray-300 px-2 py-4 text-xs">{item.nik_pemilik_foto}</td>
-                      <td className="hidden md:table-cell border border-gray-300 px-2 py-4 text-xs">{item.nama_pemilik_foto}</td>
-                      <td className="hidden md:table-cell border border-gray-300 px-2 py-4 text-xs">{item.nik_petugas_rekam}</td>
-                      <td className="hidden md:table-cell border border-gray-300 px-2 py-4 text-xs">{item.nama_petugas_rekam}</td>
+                      <td className={bodyCellClasses}>{formatDate(item.tanggal_pengajuan)}</td>
+                      <td className={bodyCellClasses}>{item.nik_adjudicate}</td>
+                      <td className={bodyCellClasses}>{item.nama_adjudicate}</td>
                       <td className="hidden md:table-cell border border-gray-300 px-2 py-4 text-xs">
-                        {new Date(item.tanggal_perekaman).toLocaleDateString("id-ID", {
-                          day: "2-digit",
-                          month: "long",
-                          year: "numeric",
-                        })}
+                        {item.jenis_eksepsi}
                       </td>
                       <td className={bodyCellClasses}>
                         <Tooltip
@@ -244,38 +296,35 @@ export default function SalahRekamTable({
                       </td>
                     </tr>
                     {isExpanded && (
-                      <tr>
-                        <td colSpan={13} className="border border-gray-300 px-2 py-4 text-xs">
+                      <motion.tr
+                        key={`detail-${item.id}`}
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.3 }}
+                      >
+                        <td colSpan={7} className="border border-gray-300 px-2 py-4 text-xs">
                           <div className="p-4 bg-gray-50 rounded-md">
                             <h3 className="text-sm font-medium text-gray-700 mb-2">Detail Data</h3>
-                            <p><strong>NIK Pemilik Biometric:</strong> {item.nik_pemilik_biometric}</p>
-                            <p><strong>Nama Pemilik Biometric:</strong> {item.nama_pemilik_biometric}</p>
-                            <p><strong>NIK Pemilik Foto:</strong> {item.nik_pemilik_foto}</p>
-                            <p><strong>Nama Pemilik Foto:</strong> {item.nama_pemilik_foto}</p>
-                            <p><strong>NIK Petugas Rekam:</strong> {item.nik_petugas_rekam}</p>
-                            <p><strong>Nama Petugas Rekam:</strong> {item.nama_petugas_rekam}</p>
+                            <p><strong>NIK Pengaju:</strong> {item.nik_pengaju}</p>
+                            <p><strong>Nama Pengaju:</strong> {item.nama_pengaju}</p>
+                            <p><strong>Jenis Eksepsi:</strong> {item.jenis_eksepsi}</p>
                             <p>
-                              <strong>Tanggal Perekaman:</strong>{" "}
-                              {new Date(item.tanggal_perekaman).toLocaleDateString("id-ID", {
-                                day: "2-digit",
-                                month: "long",
-                                year: "numeric",
-                              })}
+                              <strong>Tanggal Pengajuan:</strong> {formatDate(item.tanggal_pengajuan)}
                             </p>
                           </div>
                         </td>
-                      </tr>
+                      </motion.tr>
                     )}
-                  </>
+                  </React.Fragment>
                 );
-              })
-            )}
-          </tbody>
-        </table>
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
+      {totalPages > 1 && !isTableLoading && (
         <div className="flex justify-center mt-6">
           <Pagination
             count={totalPages}

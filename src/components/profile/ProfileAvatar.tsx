@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Compressor from "compressorjs";
 import { toast } from "react-toastify";
+import Tooltip from "@mui/material/Tooltip";
 
 interface ProfileAvatarProps {
   avatarPreview: string | null;
@@ -18,7 +19,6 @@ export default function ProfileAvatar({
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Validasi ukuran file sebelum kompresi
       const maxSizeInMB = 2;
       const maxSizeInBytes = maxSizeInMB * 1024 * 1024;
       if (file.size > maxSizeInBytes) {
@@ -26,13 +26,11 @@ export default function ProfileAvatar({
         return;
       }
 
-      // Kompresi gambar
       new Compressor(file, {
-        quality: 0.8, // Kualitas 80% untuk menjaga ketajaman
-        maxWidth: 300, // Resolusi maksimal untuk avatar
+        quality: 0.8,
+        maxWidth: 300,
         maxHeight: 300,
         success(compressedResult) {
-          // Konversi Blob menjadi File
           const compressedFile = new File([compressedResult], file.name, {
             type: compressedResult.type,
             lastModified: Date.now(),
@@ -74,15 +72,17 @@ export default function ProfileAvatar({
           />
         )}
         {isEditing && (
-          <label className="absolute bottom-0 right-0 bg-blue-500 text-white rounded-full p-2 cursor-pointer">
-            <input
-              type="file"
-              accept="image/jpeg,image/png"
-              className="hidden"
-              onChange={handleChange}
-            />
-            <span>📷</span>
-          </label>
+          <Tooltip title="Unggah Foto Profil">
+            <label className="absolute bottom-0 right-0 bg-blue-500 text-white rounded-full p-2 cursor-pointer">
+              <input
+                type="file"
+                accept="image/jpeg,image/png"
+                className="hidden"
+                onChange={handleChange}
+              />
+              <span>📷</span>
+            </label>
+          </Tooltip>
         )}
       </div>
     </div>

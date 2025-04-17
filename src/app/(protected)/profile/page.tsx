@@ -1,13 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "react-toastify";
 import ProfileHeader from "@/components/profile/ProfileHeader";
-import ProfileAvatar from "@/components/profile/ProfileAvatar";
 import ProfileForm from "@/components/profile/ProfileForm";
 import ProfileActions from "@/components/profile/ProfileActions";
+
+// Lazy load ProfileAvatar
+const ProfileAvatar = dynamic(() => import("@/components/profile/ProfileAvatar"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex justify-center mb-6">
+      <div className="w-32 h-32 rounded-full bg-gray-200 animate-pulse"></div>
+    </div>
+  ),
+});
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -16,6 +26,7 @@ export default function ProfilePage() {
     name: string;
     nip: string;
     position: string;
+    nik: string;
     avatar_url: string | null;
   } | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -23,14 +34,17 @@ export default function ProfilePage() {
     name: "",
     nip: "",
     position: "",
+    nik: "",
   });
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isFetchingProfile, setIsFetchingProfile] = useState(true);
 
   useEffect(() => {
     const fetchUserData = async () => {
       try {
+        setIsFetchingProfile(true);
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         if (sessionError || !session) {
           toast.error("Sesi tidak ditemukan. Silakan login kembali.");
@@ -42,7 +56,7 @@ export default function ProfilePage() {
 
         const { data: profileData, error: profileError } = await supabase
           .from("profiles")
-          .select("name, nip, position, avatar_url")
+          .select("name, nip, position, nik, avatar_url")
           .eq("id", session.user.id)
           .single();
 
@@ -53,6 +67,7 @@ export default function ProfilePage() {
               name: session.user.email?.split("@")[0] || "User",
               nip: "",
               position: "",
+              nik: "",
               avatar_url: null,
             };
 
@@ -67,6 +82,7 @@ export default function ProfilePage() {
               name: newProfile.name,
               nip: newProfile.nip,
               position: newProfile.position,
+              nik: newProfile.nik,
             });
           } else {
             throw new Error(`Gagal mengambil profil: ${profileError.message}`);
@@ -77,42 +93,41 @@ export default function ProfilePage() {
             name: profileData.name,
             nip: profileData.nip,
             position: profileData.position,
+            nik: profileData.nik || "",
           });
         }
       } catch (error: any) {
         console.error("Error fetching profile:", error);
         toast.error(error.message || "Gagal memuat profil. Silakan coba lagi.");
         router.push("/");
+      } finally {
+        setIsFetchingProfile(false);
       }
     };
 
     fetchUserData();
   }, [router]);
 
-  const handleAvatarChange = (compressedFile: File, previewUrl: string) => {
+  const handleAvatarChange = useCallback((compressedFile: File, previewUrl: string) => {
     setAvatarFile(compressedFile);
     setAvatarPreview(previewUrl);
-  };
+  }, []);
 
-  const handleCancel = () => {
+  const handleCancel = useCallback(() => {
     setIsEditing(false);
     setFormData({
       name: profile?.name || "",
       nip: profile?.nip || "",
       position: profile?.position || "",
+      nik: profile?.nik || "",
     });
     setAvatarFile(null);
     setAvatarPreview(null);
-  };
+  }, [profile]);
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     if (!user || !profile) {
       toast.error("Data pengguna tidak ditemukan. Silakan coba lagi.");
-      return;
-    }
-
-    if (!formData.name.trim() || !formData.position.trim()) {
-      toast.error("Nama dan Jabatan tidak boleh kosong!");
       return;
     }
 
@@ -128,69 +143,51 @@ export default function ProfilePage() {
         }
 
         const fileName = `${user.id}.${fileExt}`;
-        console.log("Generated fileName:", fileName);
-
         const maxSizeInMB = 2;
         const maxSizeInBytes = maxSizeInMB * 1024 * 1024;
         if (avatarFile.size > maxSizeInBytes) {
           throw new Error(`Ukuran file terlalu besar, maksimal ${maxSizeInMB} MB`);
         }
 
-        // Cek status autentikasi sebelum operasi storage
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         if (sessionError || !session) {
           throw new Error("Sesi autentikasi tidak valid. Silakan login kembali.");
         }
 
-        // Cek dan hapus avatar lama berdasarkan user.id
         const { data: existingFiles, error: listError } = await supabase.storage
           .from("avatars")
           .list("", { limit: 100 });
 
         if (listError) throw new Error(`Gagal memeriksa file avatar lama: ${listError.message}`);
-        console.log("Existing files before deletion:", existingFiles);
 
         const filesToDelete = existingFiles
           ?.filter((file) => file.name.startsWith(user.id + "."))
           .map((file) => file.name) || [];
 
         if (filesToDelete.length > 0) {
-          const { data: deleteData, error: deleteError } = await supabase.storage
+          const { error: deleteError } = await supabase.storage
             .from("avatars")
             .remove(filesToDelete);
 
-          if (deleteError) {
-            console.error("Delete error details:", deleteError);
-            throw new Error(`Gagal menghapus avatar lama: ${deleteError.message}`);
-          }
-          console.log("Files deleted:", deleteData);
-        } else {
-          console.log("No existing files found to delete for user:", user.id);
+          if (deleteError) throw new Error(`Gagal menghapus avatar lama: ${deleteError.message}`);
         }
 
-        // Verifikasi bahwa file lama sudah terhapus
         const { data: postDeleteFiles, error: postDeleteError } = await supabase.storage
           .from("avatars")
           .list("", { limit: 100 });
 
         if (postDeleteError) throw new Error(`Gagal memverifikasi penghapusan: ${postDeleteError.message}`);
-        console.log("Files after deletion:", postDeleteFiles);
 
         const fileStillExists = postDeleteFiles?.some((file) => file.name === fileName);
         if (fileStillExists) {
           throw new Error("File lama gagal dihapus dari storage.");
         }
 
-        // Unggah avatar baru
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        const { error: uploadError } = await supabase.storage
           .from("avatars")
           .upload(fileName, avatarFile, { upsert: true });
 
-        if (uploadError) {
-          console.error("Upload error details:", uploadError);
-          throw new Error(`Gagal mengunggah foto: ${uploadError.message}`);
-        }
-        console.log("Upload successful:", uploadData);
+        if (uploadError) throw new Error(`Gagal mengunggah foto: ${uploadError.message}`);
 
         const { data: publicUrlData } = supabase.storage
           .from("avatars")
@@ -198,32 +195,7 @@ export default function ProfilePage() {
 
         if (!publicUrlData.publicUrl) throw new Error("Gagal mendapatkan URL foto profil.");
 
-        // Tambahkan query string unik untuk mencegah caching
         avatarUrl = `${publicUrlData.publicUrl}?t=${new Date().getTime()}`;
-        console.log("New avatar URL:", avatarUrl);
-
-        // Verifikasi bahwa file baru benar-benar ada
-        const { data: verifyFiles, error: verifyError } = await supabase.storage
-          .from("avatars")
-          .list("", { limit: 100 });
-
-        if (verifyError) throw new Error(`Gagal memverifikasi file: ${verifyError.message}`);
-
-        const uploadedFileExists = verifyFiles?.some((file) => file.name === fileName);
-        if (!uploadedFileExists) {
-          throw new Error("File baru gagal diunggah ke storage.");
-        }
-        console.log("Verified files in storage:", verifyFiles);
-
-        // Verifikasi bahwa URL baru dapat diakses
-        try {
-          const response = await fetch(avatarUrl);
-          if (!response.ok) throw new Error("URL avatar baru tidak dapat diakses.");
-          console.log("Avatar URL verification successful:", avatarUrl);
-        } catch (fetchError) {
-          console.error("Fetch error details:", fetchError);
-          throw new Error("Gagal memverifikasi URL avatar baru.");
-        }
       }
 
       const { error: updateError } = await supabase
@@ -232,6 +204,7 @@ export default function ProfilePage() {
           name: formData.name.trim(),
           nip: formData.nip.trim(),
           position: formData.position.trim(),
+          nik: formData.nik.trim(),
           avatar_url: avatarUrl,
           updated_at: new Date().toISOString(),
         })
@@ -244,6 +217,7 @@ export default function ProfilePage() {
         name: formData.name.trim(),
         nip: formData.nip.trim(),
         position: formData.position.trim(),
+        nik: formData.nik.trim(),
         avatar_url: avatarUrl,
       });
 
@@ -257,12 +231,34 @@ export default function ProfilePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, profile, formData, avatarFile, router]);
 
-  if (!user || !profile) {
+  if (isFetchingProfile || !user || !profile) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <p className="text-gray-600">Memuat...</p>
+        <div className="flex items-center space-x-2">
+          <svg
+            className="animate-spin h-5 w-5 text-indigo-600"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            />
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8v8H4z"
+            />
+          </svg>
+          <p className="text-gray-600">Memuat...</p>
+        </div>
       </div>
     );
   }

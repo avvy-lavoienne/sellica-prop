@@ -8,13 +8,14 @@ export default function ProfileHeader() {
         <Image
           src={VyuLogo.src}
           alt="VYU Logo"
-          width={150}
-          height={50}
+          width={0}
+          height={0}
+          sizes="100vw"
+          className="w-32 md:w-40 h-auto object-contain"
           priority
-          className="object-contain"
         />
       </div>
-      <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">
+      <h1 className="text-2xl md:text-3xl font-bold mb-6 text-center text-gray-800">
         Profil Pengguna
       </h1>
     </>
