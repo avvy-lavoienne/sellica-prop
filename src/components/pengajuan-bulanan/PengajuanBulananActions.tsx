@@ -1,14 +1,18 @@
-"use client";
-
 import Button from "@mui/material/Button";
 import AddIcon from "@mui/icons-material/Add";
 import SummarizeIcon from "@mui/icons-material/Summarize";
 import { motion } from "framer-motion";
 
+enum ActiveMode {
+  Form = "form",
+  Table = "table",
+  None = "none",
+}
+
 interface PengajuanBulananActionsProps {
   onAjukan: () => void;
   onRekapitulasi: () => void;
-  activeMode: "none" | "form" | "table";
+  activeMode: ActiveMode;
 }
 
 export default function PengajuanBulananActions({
@@ -17,35 +21,45 @@ export default function PengajuanBulananActions({
   activeMode,
 }: PengajuanBulananActionsProps) {
   return (
-    <div className="flex space-x-4 mb-6">
+    <div className="flex justify-center space-x-4 mb-6">
       <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
         <Button
-          variant={activeMode === "form" ? "contained" : "outlined"}
+          variant="contained"
           startIcon={<AddIcon />}
           onClick={onAjukan}
+          aria-label="Ajukan pengajuan bulanan"
           sx={{
+            px: 3,
+            py: 1,
+            borderRadius: "0.375rem",
+            backgroundColor: activeMode === ActiveMode.Form ? "#3b82f6" : "#4f46e5",
+            "&:hover": {
+              backgroundColor: activeMode === ActiveMode.Form ? "#2563eb" : "#4338ca",
+            },
             textTransform: "none",
-            fontSize: "0.875rem",
-            borderRadius: "8px",
-            padding: "8px 16px",
+            fontSize: "1rem",
           }}
-          aria-label="Ajukan pengajuan baru"
         >
           Ajukan
         </Button>
       </motion.div>
       <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
         <Button
-          variant={activeMode === "table" ? "contained" : "outlined"}
+          variant="contained"
           startIcon={<SummarizeIcon />}
           onClick={onRekapitulasi}
+          aria-label="Lihat rekapitulasi pengajuan bulanan"
           sx={{
+            px: 3,
+            py: 1,
+            borderRadius: "0.375rem",
+            backgroundColor: activeMode === ActiveMode.Table ? "#22c55e" : "#16a34a",
+            "&:hover": {
+              backgroundColor: activeMode === ActiveMode.Table ? "#16a34a" : "#15803d",
+            },
             textTransform: "none",
-            fontSize: "0.875rem",
-            borderRadius: "8px",
-            padding: "8px 16px",
+            fontSize: "1rem",
           }}
-          aria-label="Lihat rekapitulasi pengajuan"
         >
           Rekapitulasi
         </Button>

@@ -34,6 +34,7 @@ interface AdjudicateRecordData {
   nama_pengaju: string;
   jenis_eksepsi: string;
   tanggal_pengajuan: string;
+  estimasi_tanggal_perekaman?: string;
   created_at: string;
   is_ready_to_record: boolean;
 }
@@ -139,9 +140,12 @@ export default function AdjudicateRecordPage() {
         let query = supabase
           .from("adjudicate_record")
           .select("*", { count: "exact" })
-          .eq("user_id", user.id)
           .order("created_at", { ascending: false })
           .range(start, end);
+
+        if (userRole === "user") {
+          query = query.eq("user_id", user.id);
+        }
 
         if (searchQuery) {
           query = query.or(
@@ -162,7 +166,7 @@ export default function AdjudicateRecordPage() {
         setIsTableLoading(false);
       }
     },
-    [user]
+    [user, userRole]
   );
 
   useEffect(() => {

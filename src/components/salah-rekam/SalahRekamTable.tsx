@@ -1,3 +1,4 @@
+import React from "react";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "react-toastify";
@@ -5,9 +6,13 @@ import ActionButtons from "@/components/ActionButton";
 import Switch from "@mui/material/Switch";
 import Pagination from "@mui/material/Pagination";
 import Tooltip from "@mui/material/Tooltip";
+import SaveIcon from "@mui/icons-material/Save";
+import IconButton from "@mui/material/IconButton";
+import { motion } from "framer-motion";
 
 interface SalahRekamData {
   id: string;
+  user_id: string;
   nik_salah_rekam: string;
   nama_salah_rekam: string;
   nik_pemilik_biometric: string;
@@ -19,6 +24,7 @@ interface SalahRekamData {
   nik_pengaju: string;
   nama_pengaju: string;
   tanggal_perekaman: string;
+  estimasi_tanggal_perekaman?: string;
   created_at: string;
   is_ready_to_record: boolean;
 }
@@ -48,9 +54,11 @@ export default function SalahRekamTable({
 }: SalahRekamTableProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [editedDates, setEditedDates] = useState<{ [key: string]: string }>({});
+  const [saving, setSaving] = useState<{ [key: string]: boolean }>({});
 
   useEffect(() => {
-    if (searchQuery === "") return; // Jangan panggil onSearch jika searchQuery kosong
+    if (searchQuery === "") return;
 
     const timeout = setTimeout(() => {
       onSearch(searchQuery);
@@ -87,6 +95,59 @@ export default function SalahRekamTable({
     }
   };
 
+  const handleDateChange = (id: string, value: string) => {
+    setEditedDates((prev) => ({ ...prev, [id]: value }));
+  };
+
+  const handleSaveDate = async (id: string) => {
+    if (!["admin", "superuser"].includes(userRole)) {
+      toast.error("Hanya admin atau superuser yang dapat mengubah tanggal.");
+      return;
+    }
+
+    const newDate = editedDates[id];
+    if (!newDate) {
+      toast.error("Tanggal tidak boleh kosong!");
+      return;
+    }
+
+    setSaving((prev) => ({ ...prev, [id]: true }));
+
+    try {
+      const { error } = await supabase
+        .from("salah_rekam")
+        .update({ estimasi_tanggal_perekaman: newDate })
+        .eq("id", id);
+
+      if (error) throw new Error(`Gagal menyimpan tanggal: ${error.message}`);
+
+      toast.success("Tanggal berhasil disimpan!");
+      onRefresh();
+      setEditedDates((prev) => {
+        const newDates = { ...prev };
+        delete newDates[id];
+        return newDates;
+      });
+    } catch (error: any) {
+      console.error("Error saving date:", error);
+      toast.error(error.message || "Gagal menyimpan tanggal. Silakan coba lagi.");
+    } finally {
+      setSaving((prev) => ({ ...prev, [id]: false }));
+    }
+  };
+
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return "-";
+    const date = new Date(dateStr);
+    return date.toString() !== "Invalid Date"
+      ? date.toLocaleDateString("id-ID", {
+          day: "2-digit",
+          month: "long",
+          year: "numeric",
+        })
+      : "Tanggal tidak valid";
+  };
+
   const wrapperDivClasses = "overflow-x-auto px-4 py-6";
   const tableClasses = "min-w-full max-w-4xl border-collapse border border-gray-300";
   const headerRowClasses = "bg-gray-100";
@@ -95,10 +156,11 @@ export default function SalahRekamTable({
   const bodyCellClasses = "border border-gray-300 px-2 py-4 text-xs";
   const emptyCellClasses = "border border-gray-300 px-2 py-4 text-center text-xs";
   const searchBoxClasses = "w-full max-w-md p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm placeholder-gray-400";
+  const inputClasses =
+    "w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-xs";
 
   return (
     <div className={wrapperDivClasses}>
-      {/* Searchbox dan Tombol Refresh */}
       <div className="flex justify-center mb-6 space-x-4">
         <div className="relative flex-1 max-w-md">
           <input
@@ -142,7 +204,6 @@ export default function SalahRekamTable({
         </button>
       </div>
 
-      {/* Tabel */}
       <div className="overflow-x-auto">
         <table className={tableClasses}>
           <thead>
@@ -158,6 +219,7 @@ export default function SalahRekamTable({
               <th className="hidden md:table-cell border border-gray-300 px-2 py-4 text-left text-xs font-medium text-gray-700">NIK Petugas Rekam</th>
               <th className="hidden md:table-cell border border-gray-300 px-2 py-4 text-left text-xs font-medium text-gray-700">Nama Petugas Rekam</th>
               <th className="hidden md:table-cell border border-gray-300 px-2 py-4 text-left text-xs font-medium text-gray-700">Tanggal Perekaman</th>
+              <th className="hidden md:table-cell border border-gray-300 px-2 py-4 text-left text-xs font-medium text-gray-700">Estimasi Tanggal Perekaman</th>
               <th className={headerCellClasses}>Status</th>
               <th className={headerCellClasses}>Aksi</th>
             </tr>
@@ -165,7 +227,7 @@ export default function SalahRekamTable({
           <tbody>
             {rekapData.length === 0 ? (
               <tr>
-                <td colSpan={13} className={emptyCellClasses}>
+                <td colSpan={14} className={emptyCellClasses}>
                   Tidak ada data yang ditemukan.
                 </td>
               </tr>
@@ -173,31 +235,37 @@ export default function SalahRekamTable({
               rekapData.map((item, index) => {
                 const rowNumber = (currentPage - 1) * rowsPerPage + index + 1;
                 const isExpanded = expandedRow === item.id;
+                const currentDate = editedDates[item.id] || item.estimasi_tanggal_perekaman || "";
                 return (
-                  <>
-                    <tr key={item.id} className={bodyRowClasses}>
+                  <React.Fragment key={item.id}>
+                    <tr className={bodyRowClasses}>
                       <td className={bodyCellClasses}>{rowNumber}</td>
                       <td className={bodyCellClasses}>
-                        {new Date(item.created_at).toLocaleDateString("id-ID", {
-                          day: "2-digit",
-                          month: "long",
-                          year: "numeric",
-                        })}
+                        {formatDate(item.created_at)}
                       </td>
-                      <td className={bodyCellClasses}>{item.nik_salah_rekam}</td>
-                      <td className={bodyCellClasses}>{item.nama_salah_rekam}</td>
-                      <td className="hidden md:table-cell border border-gray-300 px-2 py-4 text-xs">{item.nik_pemilik_biometric}</td>
-                      <td className="hidden md:table-cell border border-gray-300 px-2 py-4 text-xs">{item.nama_pemilik_biometric}</td>
-                      <td className="hidden md:table-cell border border-gray-300 px-2 py-4 text-xs">{item.nik_pemilik_foto}</td>
-                      <td className="hidden md:table-cell border border-gray-300 px-2 py-4 text-xs">{item.nama_pemilik_foto}</td>
-                      <td className="hidden md:table-cell border border-gray-300 px-2 py-4 text-xs">{item.nik_petugas_rekam}</td>
-                      <td className="hidden md:table-cell border border-gray-300 px-2 py-4 text-xs">{item.nama_petugas_rekam}</td>
+                      <td className={bodyCellClasses}>{item.nik_salah_rekam || "-"}</td>
+                      <td className={bodyCellClasses}>{item.nama_salah_rekam || "-"}</td>
+                      <td className="hidden md:table-cell border border-gray-300 px-2 py-4 text-xs">{item.nik_pemilik_biometric || "-"}</td>
+                      <td className="hidden md:table-cell border border-gray-300 px-2 py-4 text-xs">{item.nama_pemilik_biometric || "-"}</td>
+                      <td className="hidden md:table-cell border border-gray-300 px-2 py-4 text-xs">{item.nik_pemilik_foto || "-"}</td>
+                      <td className="hidden md:table-cell border border-gray-300 px-2 py-4 text-xs">{item.nama_pemilik_foto || "-"}</td>
+                      <td className="hidden md:table-cell border border-gray-300 px-2 py-4 text-xs">{item.nik_petugas_rekam || "-"}</td>
+                      <td className="hidden md:table-cell border border-gray-300 px-2 py-4 text-xs">{item.nama_petugas_rekam || "-"}</td>
                       <td className="hidden md:table-cell border border-gray-300 px-2 py-4 text-xs">
-                        {new Date(item.tanggal_perekaman).toLocaleDateString("id-ID", {
-                          day: "2-digit",
-                          month: "long",
-                          year: "numeric",
-                        })}
+                        {formatDate(item.tanggal_perekaman)}
+                      </td>
+                      <td className="hidden md:table-cell border border-gray-300 px-2 py-4 text-xs">
+                        {["admin", "superuser"].includes(userRole) ? (
+                          <input
+                            type="date"
+                            value={currentDate}
+                            onChange={(e) => handleDateChange(item.id, e.target.value)}
+                            className={inputClasses}
+                            aria-label="Estimasi Tanggal Perekaman"
+                          />
+                        ) : (
+                          formatDate(item.estimasi_tanggal_perekaman)
+                        )}
                       </td>
                       <td className={bodyCellClasses}>
                         <Tooltip
@@ -240,33 +308,62 @@ export default function SalahRekamTable({
                             showDetailButton={true}
                             isDetailOpen={isExpanded}
                           />
+                          {["admin", "superuser"].includes(userRole) && (
+                            <Tooltip title="Simpan Tanggal" arrow>
+                              <span>
+                                <IconButton
+                                  onClick={() => handleSaveDate(item.id)}
+                                  disabled={saving[item.id] || !editedDates[item.id]}
+                                  sx={{
+                                    color: saving[item.id] ? "#9ca3af" : "#4f46e5",
+                                    "&:hover": {
+                                      color: saving[item.id] ? "#9ca3af" : "#4338ca",
+                                    },
+                                  }}
+                                  aria-label="Simpan tanggal estimasi"
+                                >
+                                  <SaveIcon fontSize="small" />
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                          )}
                         </div>
                       </td>
                     </tr>
                     {isExpanded && (
-                      <tr>
-                        <td colSpan={13} className="border border-gray-300 px-2 py-4 text-xs">
+                      <motion.tr
+                        key={`detail-${item.id}`}
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.3 }}
+                      >
+                        <td colSpan={14} className="border border-gray-300 px-2 py-4 text-xs">
                           <div className="p-4 bg-gray-50 rounded-md">
                             <h3 className="text-sm font-medium text-gray-700 mb-2">Detail Data</h3>
-                            <p><strong>NIK Pemilik Biometric:</strong> {item.nik_pemilik_biometric}</p>
-                            <p><strong>Nama Pemilik Biometric:</strong> {item.nama_pemilik_biometric}</p>
-                            <p><strong>NIK Pemilik Foto:</strong> {item.nik_pemilik_foto}</p>
-                            <p><strong>Nama Pemilik Foto:</strong> {item.nama_pemilik_foto}</p>
-                            <p><strong>NIK Petugas Rekam:</strong> {item.nik_petugas_rekam}</p>
-                            <p><strong>Nama Petugas Rekam:</strong> {item.nama_petugas_rekam}</p>
+                            <p><strong>NIK Salah Rekam:</strong> {item.nik_salah_rekam || "-"}</p>
+                            <p><strong>Nama Salah Rekam:</strong> {item.nama_salah_rekam || "-"}</p>
+                            <p><strong>NIK Pemilik Biometric:</strong> {item.nik_pemilik_biometric || "-"}</p>
+                            <p><strong>Nama Pemilik Biometric:</strong> {item.nama_pemilik_biometric || "-"}</p>
+                            <p><strong>NIK Pemilik Foto:</strong> {item.nik_pemilik_foto || "-"}</p>
+                            <p><strong>Nama Pemilik Foto:</strong> {item.nama_pemilik_foto || "-"}</p>
+                            <p><strong>NIK Petugas Rekam:</strong> {item.nik_petugas_rekam || "-"}</p>
+                            <p><strong>Nama Petugas Rekam:</strong> {item.nama_petugas_rekam || "-"}</p>
+                            <p><strong>NIK Pengaju:</strong> {item.nik_pengaju || "-"}</p>
+                            <p><strong>Nama Pengaju:</strong> {item.nama_pengaju || "-"}</p>
                             <p>
                               <strong>Tanggal Perekaman:</strong>{" "}
-                              {new Date(item.tanggal_perekaman).toLocaleDateString("id-ID", {
-                                day: "2-digit",
-                                month: "long",
-                                year: "numeric",
-                              })}
+                              {formatDate(item.tanggal_perekaman)}
+                            </p>
+                            <p>
+                              <strong>Estimasi Tanggal Perekaman:</strong>{" "}
+                              {formatDate(item.estimasi_tanggal_perekaman)}
                             </p>
                           </div>
                         </td>
-                      </tr>
+                      </motion.tr>
                     )}
-                  </>
+                  </React.Fragment>
                 );
               })
             )}
@@ -274,7 +371,6 @@ export default function SalahRekamTable({
         </table>
       </div>
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex justify-center mt-6">
           <Pagination

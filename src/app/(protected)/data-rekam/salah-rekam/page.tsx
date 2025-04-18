@@ -12,6 +12,7 @@ import { motion, AnimatePresence } from "framer-motion";
 
 interface SalahRekamData {
   id: string;
+  user_id: string;
   nik_salah_rekam: string;
   nama_salah_rekam: string;
   nik_pemilik_biometric: string;
@@ -23,6 +24,7 @@ interface SalahRekamData {
   nik_pengaju: string;
   nama_pengaju: string;
   tanggal_perekaman: string;
+  estimasi_tanggal_perekaman?: string;
   created_at: string;
   is_ready_to_record: boolean;
 }
@@ -123,9 +125,12 @@ export default function SalahRekamPage() {
       let query = supabase
         .from("salah_rekam")
         .select("*", { count: "exact" })
-        .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .range(start, end);
+
+      if (userRole === "user") {
+        query = query.eq("user_id", user.id);
+      }
 
       if (searchQuery) {
         query = query.or(
@@ -149,7 +154,7 @@ export default function SalahRekamPage() {
       toast.error(error.message || "Gagal mengambil data rekap. Silakan coba lagi.");
       return { totalCount: 0 };
     }
-  }, [user]);
+  }, [user, userRole]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

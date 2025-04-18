@@ -39,6 +39,7 @@ interface DuplicateOperatorData {
   tanggal_pengajuan: string;
   created_at: string;
   is_ready_to_record: boolean;
+  estimasi_tanggal_perekaman?: string;
 }
 
 interface User {
@@ -74,9 +75,13 @@ export default function DuplicateOperatorPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [isTableLoading, setIsTableLoading] = useState(false); // State baru untuk skeleton
+  const [isTableLoading, setIsTableLoading] = useState(false);
   const [userRole, setUserRole] = useState<string>("user");
   const [searchQuery, setSearchQuery] = useState("");
+
+  const validateNIK = (nik: string) => {
+    return nik.length === 16 && /^\d{16}$/.test(nik);
+  };
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -89,9 +94,6 @@ export default function DuplicateOperatorPage() {
         }
 
         setUser(session.user);
-        if (process.env.NODE_ENV === "development") {
-          console.log("User ID:", session.user.id);
-        }
 
         const { data: profileData, error: profileError } = await supabase
           .from("profiles")
@@ -99,9 +101,11 @@ export default function DuplicateOperatorPage() {
           .eq("id", session.user.id)
           .single();
 
-        if (profileError) throw new Error(`Gagal mengambil profil: ${profileError.message}`);
+        if (profileError) {
+          throw new Error(`Gagal mengambil profil: ${profileError.message}`);
+        }
 
-        if (!profileData.nik || !/^\d{16}$/.test(profileData.nik)) {
+        if (!profileData.nik || !validateNIK(profileData.nik)) {
           toast.error("NIK Anda di profil tidak valid. Harap perbarui profil Anda terlebih dahulu.");
           router.push("/profile");
           return;
@@ -114,11 +118,7 @@ export default function DuplicateOperatorPage() {
           nama_pengaju: profileData.name,
         }));
         setUserRole(profileData.role || "user");
-        if (process.env.NODE_ENV === "development") {
-          console.log("Profile:", profileData);
-        }
       } catch (error: any) {
-        console.error("Error fetching user data:", error);
         toast.error(error.message || "Gagal memuat data pengguna. Silakan coba lagi.");
         router.push("/");
       }
@@ -135,7 +135,7 @@ export default function DuplicateOperatorPage() {
       }
 
       try {
-        setIsTableLoading(true); // Mulai skeleton loading
+        setIsTableLoading(true);
         const rowsPerPage = 5;
         const start = (page - 1) * rowsPerPage;
         const end = start + rowsPerPage - 1;
@@ -143,9 +143,12 @@ export default function DuplicateOperatorPage() {
         let query = supabase
           .from("duplicate_operator")
           .select("*", { count: "exact" })
-          .eq("user_id", user.id)
           .order("created_at", { ascending: false })
           .range(start, end);
+
+        if (userRole === "user") {
+          query = query.eq("user_id", user.id);
+        }
 
         if (searchQuery) {
           query = query.or(
@@ -154,19 +157,20 @@ export default function DuplicateOperatorPage() {
         }
 
         const { data, error, count } = await query;
-        if (error) throw new Error(`Gagal mengambil data rekap: ${error.message}`);
+        if (error) {
+          throw new Error(`Gagal mengambil data rekap: ${error.message}`);
+        }
 
         setRekapData(data || []);
         return { totalCount: count || 0 };
       } catch (error: any) {
-        console.error("Error fetching rekap data:", error);
         toast.error(error.message || "Gagal memuat data rekap. Silakan coba lagi.");
         return { totalCount: 0 };
       } finally {
-        setIsTableLoading(false); // Selesai skeleton loading
+        setIsTableLoading(false);
       }
     },
-    [user]
+    [user, userRole]
   );
 
   useEffect(() => {
@@ -187,21 +191,27 @@ export default function DuplicateOperatorPage() {
     setLoading(true);
 
     try {
-      const requiredFields = [
-        "nik_duplicate",
-        "nama_duplicate",
-        "nik_operator",
-        "nama_operator",
-        "tanggal_perekaman",
-      ];
-      for (const field of requiredFields) {
-        if (!formData[field as keyof FormData].trim()) {
-          throw new Error("Semua kolom wajib diisi!");
-        }
+      // Validasi input
+      if (!validateNIK(formData.nik_duplicate)) {
+        throw new Error("NIK Duplikat harus 16 angka!");
       }
-
-      if (!/^\d{16}$/.test(formData.nik_duplicate) || !/^\d{16}$/.test(formData.nik_operator)) {
-        throw new Error("NIK harus 16 digit!");
+      if (!formData.nama_duplicate.trim()) {
+        throw new Error("Nama Duplikat tidak boleh kosong!");
+      }
+      if (!validateNIK(formData.nik_operator)) {
+        throw new Error("NIK Operator harus 16 angka!");
+      }
+      if (!formData.nama_operator.trim()) {
+        throw new Error("Nama Operator tidak boleh kosong!");
+      }
+      if (!validateNIK(formData.nik_pengaju)) {
+        throw new Error("NIK Pengaju harus 16 angka!");
+      }
+      if (!formData.nama_pengaju.trim()) {
+        throw new Error("Nama Pengaju tidak boleh kosong!");
+      }
+      if (!formData.tanggal_perekaman) {
+        throw new Error("Tanggal Perekaman tidak boleh kosong!");
       }
 
       const today = new Date().toISOString().split("T")[0];
@@ -219,6 +229,8 @@ export default function DuplicateOperatorPage() {
         nama_pengaju: formData.nama_pengaju,
         tanggal_perekaman: formData.tanggal_perekaman,
         tanggal_pengajuan: new Date().toISOString().split("T")[0],
+        estimasi_tanggal_perekaman: null,
+        is_ready_to_record: false,
       };
 
       if (isEditing && editId) {
@@ -229,8 +241,12 @@ export default function DuplicateOperatorPage() {
           .eq("user_id", user.id)
           .maybeSingle();
 
-        if (fetchError) throw new Error(`Gagal memeriksa data: ${fetchError.message}`);
-        if (!existingData) throw new Error("Data tidak ditemukan atau Anda tidak memiliki akses.");
+        if (fetchError) {
+          throw new Error(`Gagal memeriksa data: ${fetchError.message}`);
+        }
+        if (!existingData) {
+          throw new Error("Data tidak ditemukan atau Anda tidak memiliki akses.");
+        }
 
         const { error } = await supabase
           .from("duplicate_operator")
@@ -238,11 +254,15 @@ export default function DuplicateOperatorPage() {
           .eq("id", editId)
           .eq("user_id", user.id);
 
-        if (error) throw new Error(`Gagal memperbarui data: ${error.message}`);
+        if (error) {
+          throw new Error(`Gagal memperbarui data: ${error.message}`);
+        }
         toast.success("Data berhasil diperbarui!");
       } else {
         const { error } = await supabase.from("duplicate_operator").insert(dataToSave);
-        if (error) throw new Error(`Gagal menyimpan data: ${error.message}`);
+        if (error) {
+          throw new Error(`Gagal menyimpan data: ${error.message}`);
+        }
         toast.success("Data berhasil diajukan!");
       }
 
@@ -254,8 +274,8 @@ export default function DuplicateOperatorPage() {
         nama_duplicate: "",
         nik_operator: "",
         nama_operator: "",
-        nik_pengaju: profile?.nik ?? "",
-        nama_pengaju: profile?.name ?? "",
+        nik_pengaju: profile.nik,
+        nama_pengaju: profile.name,
         tanggal_perekaman: "",
       });
 
@@ -264,7 +284,6 @@ export default function DuplicateOperatorPage() {
         setTotalCount(totalCount);
       }
     } catch (error: any) {
-      console.error("Error saving data:", error);
       toast.error(error.message || "Gagal menyimpan data. Silakan coba lagi.");
     } finally {
       setLoading(false);
@@ -318,8 +337,12 @@ export default function DuplicateOperatorPage() {
         .eq("user_id", user.id)
         .maybeSingle();
 
-      if (fetchError) throw new Error(`Gagal memeriksa data: ${fetchError.message}`);
-      if (!existingData) throw new Error("Data tidak ditemukan atau Anda tidak memiliki akses.");
+      if (fetchError) {
+        throw new Error(`Gagal memeriksa data: ${fetchError.message}`);
+      }
+      if (!existingData) {
+        throw new Error("Data tidak ditemukan atau Anda tidak memiliki akses.");
+      }
 
       const { error } = await supabase
         .from("duplicate_operator")
@@ -327,12 +350,13 @@ export default function DuplicateOperatorPage() {
         .eq("id", id)
         .eq("user_id", user.id);
 
-      if (error) throw new Error(`Gagal menghapus data: ${error.message}`);
+      if (error) {
+        throw new Error(`Gagal menghapus data: ${error.message}`);
+      }
       toast.success("Data berhasil dihapus!");
       const { totalCount } = await fetchRekapData(currentPage, searchQuery);
       setTotalCount(totalCount);
     } catch (error: any) {
-      console.error("Error deleting data:", error);
       toast.error(error.message || "Gagal menghapus data. Silakan coba lagi.");
     }
   };
@@ -402,8 +426,8 @@ export default function DuplicateOperatorPage() {
               nama_duplicate: "",
               nik_operator: "",
               nama_operator: "",
-              nik_pengaju: profile?.nik ?? "",
-              nama_pengaju: profile?.name ?? "",
+              nik_pengaju: profile.nik,
+              nama_pengaju: profile.name,
               tanggal_perekaman: "",
             });
           }}
@@ -455,7 +479,7 @@ export default function DuplicateOperatorPage() {
                 onEdit={handleEdit}
                 onDelete={handleDelete}
                 userRole={userRole}
-                isTableLoading={isTableLoading} // Kirim prop baru
+                isTableLoading={isTableLoading}
               />
             </motion.div>
           )}

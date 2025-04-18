@@ -5,6 +5,8 @@ import ActionButtons from "@/components/ActionButton";
 import Switch from "@mui/material/Switch";
 import Pagination from "@mui/material/Pagination";
 import Tooltip from "@mui/material/Tooltip";
+import SaveIcon from "@mui/icons-material/Save";
+import IconButton from "@mui/material/IconButton";
 import { motion } from "framer-motion";
 
 interface DuplicateOperatorData {
@@ -20,6 +22,7 @@ interface DuplicateOperatorData {
   tanggal_pengajuan: string;
   created_at: string;
   is_ready_to_record: boolean;
+  estimasi_tanggal_perekaman?: string; // Kolom baru
 }
 
 interface DuplicateOperatorTableProps {
@@ -32,7 +35,7 @@ interface DuplicateOperatorTableProps {
   onEdit: (data: DuplicateOperatorData) => void;
   onDelete: (id: string) => void;
   userRole: string;
-  isTableLoading: boolean; // Prop baru untuk skeleton
+  isTableLoading: boolean;
 }
 
 export default function DuplicateOperatorTable({
@@ -49,6 +52,8 @@ export default function DuplicateOperatorTable({
 }: DuplicateOperatorTableProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [editedDates, setEditedDates] = useState<{ [key: string]: string }>({});
+  const [saving, setSaving] = useState<{ [key: string]: boolean }>({});
 
   useEffect(() => {
     if (searchQuery === "") return;
@@ -85,7 +90,49 @@ export default function DuplicateOperatorTable({
     }
   };
 
-  const formatDate = (dateStr: string) => {
+  const handleDateChange = (id: string, value: string) => {
+    setEditedDates((prev) => ({ ...prev, [id]: value }));
+  };
+
+  const handleSaveDate = async (id: string) => {
+    if (!["admin", "superuser"].includes(userRole)) {
+      toast.error("Hanya admin atau superuser yang dapat mengubah tanggal.");
+      return;
+    }
+
+    const newDate = editedDates[id];
+    if (!newDate) {
+      toast.error("Tanggal tidak boleh kosong!");
+      return;
+    }
+
+    setSaving((prev) => ({ ...prev, [id]: true }));
+
+    try {
+      const { error } = await supabase
+        .from("duplicate_operator")
+        .update({ estimasi_tanggal_perekaman: newDate })
+        .eq("id", id);
+
+      if (error) throw new Error(`Gagal menyimpan tanggal: ${error.message}`);
+
+      toast.success("Tanggal berhasil disimpan!");
+      onRefresh();
+      setEditedDates((prev) => {
+        const newDates = { ...prev };
+        delete newDates[id];
+        return newDates;
+      });
+    } catch (error: any) {
+      console.error("Error saving date:", error);
+      toast.error(error.message || "Gagal menyimpan tanggal. Silakan coba lagi.");
+    } finally {
+      setSaving((prev) => ({ ...prev, [id]: false }));
+    }
+  };
+
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return "-";
     const date = new Date(dateStr);
     return date.toString() !== "Invalid Date"
       ? date.toLocaleDateString("id-ID", {
@@ -104,10 +151,11 @@ export default function DuplicateOperatorTable({
   const bodyCellClasses = "border border-gray-300 px-2 py-4 text-xs";
   const emptyCellClasses = "border border-gray-300 px-2 py-4 text-center text-xs";
   const searchBoxClasses = "w-full max-w-md p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm placeholder-gray-400";
+  const inputClasses =
+    "w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-xs";
   const skeletonRowClasses = "h-14 bg-gray-200 animate-pulse rounded-md";
   const skeletonCellClasses = "border border-gray-300 px-2 py-4";
 
-  // Komponen Skeleton
   const SkeletonTable = () => (
     <table className={tableClasses}>
       <thead>
@@ -119,6 +167,7 @@ export default function DuplicateOperatorTable({
           <th className="hidden md:table-cell border border-gray-300 px-2 py-4 text-left text-xs font-medium text-gray-700">NIK Operator</th>
           <th className="hidden md:table-cell border border-gray-300 px-2 py-4 text-left text-xs font-medium text-gray-700">Nama Operator</th>
           <th className="hidden md:table-cell border border-gray-300 px-2 py-4 text-left text-xs font-medium text-gray-700">Tanggal Perekaman</th>
+          <th className="hidden md:table-cell border border-gray-300 px-2 py-4 text-left text-xs font-medium text-gray-700">Estimasi Tanggal Perekaman</th>
           <th className={headerCellClasses}>Status</th>
           <th className={headerCellClasses}>Aksi</th>
         </tr>
@@ -147,6 +196,9 @@ export default function DuplicateOperatorTable({
             <td className="hidden md:table-cell border border-gray-300 px-2 py-4">
               <div className={`${skeletonRowClasses} h-4 w-24`}></div>
             </td>
+            <td className="hidden md:table-cell border border-gray-300 px-2 py-4">
+              <div className={`${skeletonRowClasses} h-4 w-24`}></div>
+            </td>
             <td className={skeletonCellClasses}>
               <div className={`${skeletonRowClasses} h-6 w-12 mx-auto`}></div>
             </td>
@@ -170,7 +222,7 @@ export default function DuplicateOperatorTable({
             onChange={(e) => setSearchQuery(e.target.value)}
             className={searchBoxClasses}
             aria-label="Cari data di tabel"
-            disabled={isTableLoading} // Nonaktifkan input saat loading
+            disabled={isTableLoading}
           />
           {searchQuery && (
             <button
@@ -225,13 +277,14 @@ export default function DuplicateOperatorTable({
                 <th className="hidden md:table-cell border border-gray-300 px-2 py-4 text-left text-xs font-medium text-gray-700">NIK Operator</th>
                 <th className="hidden md:table-cell border border-gray-300 px-2 py-4 text-left text-xs font-medium text-gray-700">Nama Operator</th>
                 <th className="hidden md:table-cell border border-gray-300 px-2 py-4 text-left text-xs font-medium text-gray-700">Tanggal Perekaman</th>
+                <th className="hidden md:table-cell border border-gray-300 px-2 py-4 text-left text-xs font-medium text-gray-700">Estimasi Tanggal Perekaman</th>
                 <th className={headerCellClasses}>Status</th>
                 <th className={headerCellClasses}>Aksi</th>
               </tr>
             </thead>
             <tbody>
               <tr key="empty-row">
-                <td colSpan={9} className={emptyCellClasses}>
+                <td colSpan={10} className={emptyCellClasses}>
                   Tidak ada data yang ditemukan.
                 </td>
               </tr>
@@ -248,6 +301,7 @@ export default function DuplicateOperatorTable({
                 <th className="hidden md:table-cell border border-gray-300 px-2 py-4 text-left text-xs font-medium text-gray-700">NIK Operator</th>
                 <th className="hidden md:table-cell border border-gray-300 px-2 py-4 text-left text-xs font-medium text-gray-700">Nama Operator</th>
                 <th className="hidden md:table-cell border border-gray-300 px-2 py-4 text-left text-xs font-medium text-gray-700">Tanggal Perekaman</th>
+                <th className="hidden md:table-cell border border-gray-300 px-2 py-4 text-left text-xs font-medium text-gray-700">Estimasi Tanggal Perekaman</th>
                 <th className={headerCellClasses}>Status</th>
                 <th className={headerCellClasses}>Aksi</th>
               </tr>
@@ -256,6 +310,7 @@ export default function DuplicateOperatorTable({
               {rekapData.map((item, index) => {
                 const rowNumber = (currentPage - 1) * rowsPerPage + index + 1;
                 const isExpanded = expandedRow === item.id;
+                const currentDate = editedDates[item.id] || item.estimasi_tanggal_perekaman || "";
                 return (
                   <React.Fragment key={item.id}>
                     <tr className={bodyRowClasses}>
@@ -267,6 +322,19 @@ export default function DuplicateOperatorTable({
                       <td className="hidden md:table-cell border border-gray-300 px-2 py-4 text-xs">{item.nama_operator}</td>
                       <td className="hidden md:table-cell border border-gray-300 px-2 py-4 text-xs">
                         {formatDate(item.tanggal_perekaman)}
+                      </td>
+                      <td className="hidden md:table-cell border border-gray-300 px-2 py-4 text-xs">
+                        {["admin", "superuser"].includes(userRole) ? (
+                          <input
+                            type="date"
+                            value={currentDate}
+                            onChange={(e) => handleDateChange(item.id, e.target.value)}
+                            className={inputClasses}
+                            aria-label="Estimasi Tanggal Perekaman"
+                          />
+                        ) : (
+                          formatDate(item.estimasi_tanggal_perekaman)
+                        )}
                       </td>
                       <td className={bodyCellClasses}>
                         <Tooltip
@@ -309,6 +377,25 @@ export default function DuplicateOperatorTable({
                             showDetailButton={true}
                             isDetailOpen={isExpanded}
                           />
+                          {["admin", "superuser"].includes(userRole) && (
+                            <Tooltip title="Simpan Tanggal" arrow>
+                              <span>
+                                <IconButton
+                                  onClick={() => handleSaveDate(item.id)}
+                                  disabled={saving[item.id] || !editedDates[item.id]}
+                                  sx={{
+                                    color: saving[item.id] ? "#9ca3af" : "#4f46e5Integral CF",
+                                    "&:hover": {
+                                      color: saving[item.id] ? "#9ca3af" : "#4338ca",
+                                    },
+                                  }}
+                                  aria-label="Simpan tanggal estimasi"
+                                >
+                                  <SaveIcon fontSize="small" />
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -320,13 +407,21 @@ export default function DuplicateOperatorTable({
                         exit={{ opacity: 0, height: 0 }}
                         transition={{ duration: 0.3 }}
                       >
-                        <td colSpan={9} className="border border-gray-300 px-2 py-4 text-xs">
+                        <td colSpan={10} className="border border-gray-300 px-2 py-4 text-xs">
                           <div className="p-4 bg-gray-50 rounded-md">
                             <h3 className="text-sm font-medium text-gray-700 mb-2">Detail Data</h3>
+                            <p><strong>NIK Duplikat:</strong> {item.nik_duplicate}</p>
+                            <p><strong>Nama Duplikat:</strong> {item.nama_duplicate}</p>
                             <p><strong>NIK Operator:</strong> {item.nik_operator}</p>
                             <p><strong>Nama Operator:</strong> {item.nama_operator}</p>
+                            <p><strong>NIK Pengaju:</strong> {item.nik_pengaju}</p>
+                            <p><strong>Nama Pengaju:</strong> {item.nama_pengaju}</p>
                             <p>
                               <strong>Tanggal Perekaman:</strong> {formatDate(item.tanggal_perekaman)}
+                            </p>
+                            <p>
+                              <strong>Estimasi Tanggal Perekaman:</strong>{" "}
+                              {formatDate(item.estimasi_tanggal_perekaman)}
                             </p>
                           </div>
                         </td>
